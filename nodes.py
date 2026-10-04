@@ -186,9 +186,9 @@ def _debug_dump(vae, latents):
         Image.fromarray(frame).save(os.path.join(out_dir, name + ".png"))
 
 
-def progressive_sample(model, positive, negative, vae, latent_image, sampler, sigmas, seed, cfg,
+def progressive_sample(low_res_model, positive, negative, vae, latent_image, sampler, sigmas, seed, cfg,
                        transition_step, lowres_scale, rho, w_min, w_max, latent_upsample, latent_lifter=None,
-                       highres_tiling=False, model_hires=None, tiling_mode="auto", tiling_tiles=2,
+                       highres_tiling=False, high_res_model=None, tiling_mode="auto", tiling_tiles=2,
                        tiling_axis="auto", on_tiling_plan=None):
     _validate_schedule(sigmas, transition_step)
     if sigmas.numel() < 2:
@@ -206,13 +206,15 @@ def progressive_sample(model, positive, negative, vae, latent_image, sampler, si
         if noise_masks is not None:
             logging.info("[selflift-Avatar tiling] video=generate, audio=fully preserved; full audio conditioning on every spatial tile")
 
+    model = low_res_model
     model_sampling = model.get_model_object("model_sampling")
     _validate_sampling(model_sampling, sampler)
 
     streams, nested = _streams(comfy.sample.fix_empty_latent_channels(
         model, latent_image["samples"], latent_image.get("downscale_ratio_spacial", None),
         latent_image.get("downscale_ratio_temporal", None)))
-    hires_base = model_hires if model_hires is not None else model
+    hires_base = high_res_model if high_res_model is not None else model
+    _validate_sampling(hires_base.get_model_object("model_sampling"), sampler)
     high_model = h3_tiling.tiled_model(hires_base, [tuple(stream.shape) for stream in streams],
                                          mode=tiling_mode, tiles=tiling_tiles, axis=tiling_axis,
                                          on_plan=on_tiling_plan) if highres_tiling else hires_base
@@ -235,7 +237,7 @@ def progressive_sample(model, positive, negative, vae, latent_image, sampler, si
                  "skipped" if rho == 1.0 and w_min == 1.0 else "external" if latent_lifter is not None else latent_upsample,
                  rho > 0.0 and w_max > 0.0, cfg,
                  "none" if noise_masks is None else str([tuple(m.shape) for m in noise_masks]),
-                 "custom" if model_hires is not None else "same")
+                 "custom" if hires_base is not model else "same")
 
     device = comfy.model_management.intermediate_device()
     source_video = streams[0].to(device)
@@ -385,10 +387,10 @@ def progressive_sample(model, positive, negative, vae, latent_image, sampler, si
         high_timer.mark(f"step {step + 1}/{total_steps - transition_step}" + (" (includes setup)" if step == 0 else ""))
         return result
 
-    high_timer = _StageTimer("high_resolution", model.load_device, (H, W), resolution_scale)
+    high_timer = _StageTimer("high_resolution", high_model.load_device, (H, W), resolution_scale)
     if highres_tiling:
         logging.info("[selflift-Avatar plan] high-resolution tiling enabled; mode=%s axis=%s", tiling_mode, tiling_axis)
-    out = comfy.samplers.sample(high_model, resume_noise, positive, negative, cfg, model.load_device,
+    out = comfy.samplers.sample(high_model, resume_noise, positive, negative, cfg, high_model.load_device,
                                 sampler, sigmas[transition_step:], high_model.model_options,
                                 latent_image=resume_latent, callback=callback_high,
                                 disable_pbar=disable_pbar, seed=seed)
@@ -413,7 +415,7 @@ class SelfLiftAvatarH3Sampler:
     @classmethod
     def INPUT_TYPES(cls):
         return {"required": {
-            "model": ("MODEL",),
+            "low_res_model": ("MODEL", {"tooltip": "Low-resolution model used for the first transition_step evaluations. Also used for the high-resolution stage when high_res_model is disconnected."}),
             "positive": ("CONDITIONING",),
             "negative": ("CONDITIONING",),
             "vae": ("VAE", {"tooltip": "Video VAE used for the pixel re-encode anchor at the resolution transition."}),
@@ -429,7 +431,7 @@ class SelfLiftAvatarH3Sampler:
             "w_max": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Correction-strength ceiling. Keep at 1.0 for the H3 SelfLift-zero diagnostic."}),
             "upscaler_model": _upscaler_input(),
         }, "optional": {
-            "model_hires": ("MODEL", {"tooltip": "Optional: model used for the high-resolution stage instead of `model` (e.g. a different checkpoint or LoRA stack). Must share the same architecture and latent format. The low-resolution prefix always runs on `model`."}),
+            "high_res_model": ("MODEL", {"tooltip": "高分辨率阶段模型 / High-resolution model. Used after the resolution lift. If disconnected, uses low_res_model. Both stages must use compatible architecture, latent format, sampling parameterization, VAE and conditioning."}),
             "highres_tiling": ("BOOLEAN", {"default": False, "label_on": "高分辨率分块：开启", "label_off": "高分辨率分块：关闭", "tooltip": "Experimental: spatial tiling; auto/manual controls below. 1 tile means no split. Masks supported only for video=1 everywhere / audio=0 everywhere. Every tile receives complete audio and audio conditioning. Without masks, only the first tile audio prediction is retained. Quality and speed may change."}),
             "tiling_mode": (["auto", "manual"], {"default": "auto", "tooltip": "auto 自动: choose 1–8 tiles using memory estimates. manual 手动: use tiling_tiles, no automatic increase. Only active when highres_tiling is on."}),
             "tiling_tiles": ([2, 4, 6, 8], {"default": 2, "tooltip": "手动块数 / Manual tiles: 2, 4, 6, 8. Ignored in auto mode. Turn highres_tiling off for full-frame processing. Small dimensions can reduce the effective count. Does not guarantee enough VRAM."}),
@@ -440,8 +442,8 @@ class SelfLiftAvatarH3Sampler:
     FUNCTION = "sample"
     CATEGORY = "selflift-Avatar"
 
-    def sample(self, model, positive, negative, vae, latent_image, sampler, sigmas, seed, cfg,
-               transition_step, lowres_scale, rho, w_min, w_max, upscaler_model, model_hires=None, highres_tiling=False,
+    def sample(self, low_res_model, positive, negative, vae, latent_image, sampler, sigmas, seed, cfg,
+               transition_step, lowres_scale, rho, w_min, w_max, upscaler_model, high_res_model=None, highres_tiling=False,
                tiling_mode="auto", tiling_tiles=2, tiling_axis="auto", unique_id=None):
         if rho == 0.0 and upscaler_model == "none":
             raise ValueError(
@@ -470,9 +472,9 @@ class SelfLiftAvatarH3Sampler:
 
         send_status(summary)
         try:
-            output = progressive_sample(model, positive, negative, vae, latent_image, sampler, sigmas, seed, cfg,
+            output = progressive_sample(low_res_model, positive, negative, vae, latent_image, sampler, sigmas, seed, cfg,
                                         transition_step, lowres_scale, rho, w_min, w_max, "nearest",
-                                        latent_lifter=lifter, highres_tiling=highres_tiling, model_hires=model_hires,
+                                        latent_lifter=lifter, highres_tiling=highres_tiling, high_res_model=high_res_model,
                                         tiling_mode=tiling_mode, tiling_tiles=tiling_tiles, tiling_axis=tiling_axis,
                                         on_tiling_plan=report)
         except Exception:
@@ -490,7 +492,7 @@ class SelfLiftAvatarImageSampler:
     @classmethod
     def INPUT_TYPES(cls):
         return {"required": {
-            "model": ("MODEL",),
+            "low_res_model": ("MODEL", {"tooltip": "Low-resolution model used for the first transition_step evaluations. Also used for the high-resolution stage when high_res_model is disconnected."}),
             "positive": ("CONDITIONING",),
             "negative": ("CONDITIONING",),
             "vae": ("VAE", {"tooltip": "VAE used for the pixel re-encode anchor at the resolution transition."}),
@@ -506,18 +508,18 @@ class SelfLiftAvatarImageSampler:
             "w_max": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.05}),
             "latent_upsample": (["nearest", "bilinear"], {"default": "nearest", "tooltip": "Interpolation for the direct latent lift (paper: nearest)."}),
         }, "optional": {
-            "model_hires": ("MODEL", {"tooltip": "Optional: model used for the high-resolution stage instead of `model` (e.g. a different checkpoint or LoRA stack). Must share the same architecture and latent format. The low-resolution prefix always runs on `model`."}),
+            "high_res_model": ("MODEL", {"tooltip": "高分辨率阶段模型 / High-resolution model. Used after the resolution lift. If disconnected, uses low_res_model. Both stages must use compatible architecture, latent format, sampling parameterization, VAE and conditioning."}),
         }}
 
     RETURN_TYPES = ("LATENT",)
     FUNCTION = "sample"
     CATEGORY = "selflift-Avatar"
 
-    def sample(self, model, positive, negative, vae, latent_image, sampler, sigmas, seed, cfg,
-               transition_step, lowres_scale, rho, w_min, w_max, latent_upsample, model_hires=None):
-        return (progressive_sample(model, positive, negative, vae, latent_image, sampler, sigmas, seed, cfg,
+    def sample(self, low_res_model, positive, negative, vae, latent_image, sampler, sigmas, seed, cfg,
+               transition_step, lowres_scale, rho, w_min, w_max, latent_upsample, high_res_model=None):
+        return (progressive_sample(low_res_model, positive, negative, vae, latent_image, sampler, sigmas, seed, cfg,
                                    transition_step, lowres_scale, rho, w_min, w_max, latent_upsample,
-                                   model_hires=model_hires),)
+                                   high_res_model=high_res_model),)
 
 
 class SelfLiftAvatarH3TST:

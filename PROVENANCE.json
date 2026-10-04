@@ -11,20 +11,22 @@
     "selflift.py": "866ccdbe6dc37797cef6d36a8f823836d80e141891b38b0a457b4e9cc8f998ce"
   },
   "published_python_sha256": {
+    "__init__.py": "fd4eb6d2e8dabf417ea0cccea373422c9376b53f2b90d06daf1624e42a17da07",
     "avatar_masks.py": "8c96af33ced2e8c4a7fd0c9160babfa002e9f255e182205d004035e2692b70a7",
     "avatar_sampling.py": "d4540a6e01ca79aca9b5e009a81fedb60d508eaa45f7fc297ca52d2055137e90",
     "diagnostics.py": "a4a81b2ddc6a2f8b4cf6be040c184e0b0b848513ed21a332a7169215f5f55641",
     "h3_tiling.py": "b9e81dc4b1827798cb9d2cefb6a40878edb89e949f9fd8dcde1a503988d51b3e",
     "h3_tst.py": "20fd3def8a1d172abb2ee2563ef5f83af28d006300f43a92d1abef244651af13",
     "h3_upscaler.py": "63d0683e04ed81dbfb2fcc6a61fa55cf742d6c04a87455fbf1f2353b1239322a",
-    "nodes.py": "42293d730f68669a2c2782fd09532e5d9337d7a17d7e93118424e0ab812f7545",
+    "nodes.py": "64c2f6e9e9635a7bb55b4f29a7ea37d6a3045ab7cf0729b6f55ad1237584f826",
     "selflift.py": "e38aa972b9bd6044aa28bf468018984ec7ac886e7aeb615dbd49c16cd779b26e",
-    "tiling_ui.py": "5d9ec8fb946809021e8b8c64bff275eeda2b507f7e2bacce06977509ed974f0c",
-    "__init__.py": "fd4eb6d2e8dabf417ea0cccea373422c9376b53f2b90d06daf1624e42a17da07",
-    "tests/test_avatar.py": "b4381689eb1d8065b40ca7a461061599c7e7241b933b6b42edd72c622fe6026d"
+    "tests/test_avatar.py": "bf4f9c75dee08ca680be726b37c91f50a7afd34a4bae0ae44896460eafa169a3",
+    "tiling_ui.py": "5d9ec8fb946809021e8b8c64bff275eeda2b507f7e2bacce06977509ed974f0c"
   },
   "published_frontend_sha256": {
-    "web/tiling_controls.js": "7161108525b2f7663d7410e430c4e3f8bd020cb8cbfadd881b138b250e597373",
-    "tests/test_tiling_ui.mjs": "7295a1861d622b9510a4c33aac7ce8762959e3cc7e84145935829898a0b7cb81"
+    "tests/test_model_input_order.mjs": "f9f35ab6626329d944a9891b43a4f03382345af449c48e7eb9e2a7f0d61e6ce6",
+    "tests/test_tiling_ui.mjs": "7295a1861d622b9510a4c33aac7ce8762959e3cc7e84145935829898a0b7cb81",
+    "web/model_input_order.js": "c78398633f6d768d50977a598240d82cc5f4f8883b9f76c7372d98e9aed8bd78",
+    "web/tiling_controls.js": "7161108525b2f7663d7410e430c4e3f8bd020cb8cbfadd881b138b250e597373"
   }
 }

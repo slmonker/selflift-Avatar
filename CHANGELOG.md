@@ -1,5 +1,14 @@
 # Changelog
 
+## Main branch — 2026-10-05 (not yet packaged)
+
+- Use required `low_res_model` and optional `high_res_model` on both H3 and Image samplers; high resolution falls back to the low-resolution model when disconnected.
+- Breaking workflow change: remove sampler inputs `model` and `model_hires`; existing workflows must reconnect to the new inputs. The H3 TST patch node is unchanged.
+- Display the high-resolution socket directly below the low-resolution socket and preserve link targets when reordering restored root-graph inputs.
+- Use the selected high-resolution model's load device for its sampling stage and validate its sampler compatibility.
+- Document wiring, migration, shared-conditioning constraints, and verification limits in both READMEs.
+- 53 CPU tests and both frontend test suites pass. Real dual-model quality and peak VRAM remain unverified; the v0.1.4 release archive is unchanged.
+
 ## v0.1.4-experimental — 2026-09-18
 
 - Display actual automatic tile count on the first line of the node panel; show pending before planning and no-split for one tile.
