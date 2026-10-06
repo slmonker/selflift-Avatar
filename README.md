@@ -1,14 +1,16 @@
 # selflift-Avatar
 
-**Development: `main` (separate stage models)** · **Packaged release: `v0.1.4-experimental`** · [中文说明](README_CN.md) · [Changelog](CHANGELOG.md) · [v0.1.4 release](https://github.com/slmonker/selflift-Avatar/releases/tag/v0.1.4-experimental)
+**Development: `main` (model input naming and layout)** · **Packaged release: `v0.1.4-experimental`** · [中文说明](README_CN.md) · [Changelog](CHANGELOG.md) · [v0.1.4 release](https://github.com/slmonker/selflift-Avatar/releases/tag/v0.1.4-experimental)
 
 An independent experimental SelfLift branch for ComfyUI / MiniMax H3. It focuses on H3 audio-video latent masks, preserving source audio during sampling, and a narrowly supported high-resolution tiling path. It registers separate node IDs, so it can coexist with the original SelfLift plugin.
 
 > **Experimental, unofficial project.** The current code has passed 53 CPU tests and two frontend suites with stubs. Earlier versions were exercised in the maintainer's H3 workflow; the new controls still need broader real-model and frontend testing. This is not a systematic benchmark of lip-sync accuracy, speed, or every model/plugin combination. Results can vary by character, audio, prompt, sampler, latent upscaler, and seed.
 
-## Main-branch update: separate stage models (2026-10-05)
+## Main-branch update: model input naming and layout (2026-10-05)
 
-**Use different models for the low-resolution and high-resolution stages inside the same sampler node.** Available on both the MiniMax H3 and Image samplers.
+**Dual-model sampling was already supported through `model` and `model_hires`; this update does not introduce that capability.** Both the MiniMax H3 and Image samplers now use clearer names: `model` → `low_res_model`, and `model_hires` → `high_res_model`. The optional high-resolution input retains its existing fallback to the low-resolution model.
+
+This update groups the two sockets together, corrects the high-resolution sampling call to use the selected model's load device, validates that model's sampler compatibility, and adds regression tests. It does not add forced model unloading or an OOM-prevention guarantee.
 
 | Input | Required | Used for |
 | --- | --- | --- |
@@ -26,7 +28,7 @@ For a single-model workflow, connect only `low_res_model`. High-resolution tilin
 
 ### Upgrade / reconnect existing workflows
 
-**Breaking input change:** the old sampler sockets `model` and `model_hires` have been removed. Back up your workflow before updating, restart the ComfyUI backend, and hard-refresh the browser. Re-add the sampler if stale sockets remain, then reconnect:
+**Breaking input rename:** `model` is now `low_res_model`, and `model_hires` is now `high_res_model`; the old input names are no longer accepted. Back up your workflow before updating, restart the ComfyUI backend, and hard-refresh the browser. Re-add the sampler if stale sockets remain, then reconnect:
 
 - Previous `model` connection → `low_res_model`.
 - Previous `model_hires` connection → `high_res_model` (if used).

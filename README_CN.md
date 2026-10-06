@@ -1,14 +1,16 @@
 # selflift-Avatar
 
-**开发版：`main`（分阶段独立模型）** · **已打包版本：`v0.1.4-experimental`** · [English README](README.md) · [更新记录](CHANGELOG.md) · [v0.1.4 发布页](https://github.com/slmonker/selflift-Avatar/releases/tag/v0.1.4-experimental)
+**开发版：`main`（模型接口命名与布局优化）** · **已打包版本：`v0.1.4-experimental`** · [English README](README.md) · [更新记录](CHANGELOG.md) · [v0.1.4 发布页](https://github.com/slmonker/selflift-Avatar/releases/tag/v0.1.4-experimental)
 
 这是一个面向 ComfyUI / MiniMax H3 的 SelfLift 独立实验分支，重点处理 H3 音视频 latent 遮罩、采样过程中的原始音频保留，以及一个有限制的高分辨率自动分块路径。它使用独立的节点 ID，可以和原版 SelfLift 共存。
 
 > **实验版本，非官方项目。** 当前代码已通过 53 项 CPU 测试和两套模拟前端测试。此前版本已在维护者的 H3 工作流中试用；新控件仍需更多真实模型与前端测试。尚未进行系统性的口型准确率、速度和所有模型/插件组合测试。不同角色、音频、提示词、采样器、latent upscaler 和 seed 可能产生不同结果。
 
-## 主分支更新：低清 / 高清独立模型（2026-10-05）
+## 主分支更新：模型接口命名与布局优化（2026-10-05）
 
-**在同一个采样节点内，分别指定低分辨率阶段和高分辨率阶段的模型。** MiniMax H3 和 Image 两个采样器均支持。
+**双模型采样原本就通过 `model` 和 `model_hires` 支持，并非本次新增能力。** 本次将 MiniMax H3 和 Image 采样器的接口改为更明确的名称：`model` → `low_res_model`，`model_hires` → `high_res_model`。高分辨率接口仍为可选，不接时沿用低分辨率模型的原有逻辑不变。
+
+本次还将两个接口相邻排列，修正高清采样调用以使用所选模型的加载设备，校验该模型的采样器兼容性，并补充回归测试。本次没有加入强制卸载模型的功能，也不保证不会显存溢出。
 
 | 接口 | 是否必填 | 作用 |
 | --- | --- | --- |
@@ -26,7 +28,7 @@
 
 ### 升级与旧工作流迁移
 
-**接口不兼容变更：**采样节点的旧接口 `model`、`model_hires` 已删除。升级前先备份工作流，更新后重启 ComfyUI 后端并强制刷新网页；如果旧接口仍残留，请重新添加采样节点，再按下列方式接线：
+**接口重命名导致的兼容性变更：**`model` 已改名为 `low_res_model`，`model_hires` 已改名为 `high_res_model`，旧输入名不再接受。升级前先备份工作流，更新后重启 ComfyUI 后端并强制刷新网页；如果旧接口仍残留，请重新添加采样节点，再按下列方式接线：
 
 - 原 `model` 连线 → `low_res_model`。
 - 原 `model_hires` 连线 → `high_res_model`（如有使用）。

@@ -1,9 +1,14 @@
 # Changelog
 
+## Documentation correction — 2026-10-06
+
+- Clarify that dual-model sampling already existed through `model` / `model_hires`. The October 5 update renames and reorders those inputs, corrects high-resolution device selection, and adds validation/tests; it does not introduce dual-model sampling or forced unloading.
+- Correct both READMEs and the update description below. No runtime code changes.
+
 ## Main branch — 2026-10-05 (not yet packaged)
 
-- Use required `low_res_model` and optional `high_res_model` on both H3 and Image samplers; high resolution falls back to the low-resolution model when disconnected.
-- Breaking workflow change: remove sampler inputs `model` and `model_hires`; existing workflows must reconnect to the new inputs. The H3 TST patch node is unchanged.
+- Rename existing dual-model inputs on both H3 and Image samplers: required `model` → `low_res_model`, optional `model_hires` → `high_res_model`. Preserve the existing high-resolution fallback to the low-resolution model; dual-model sampling is not new in this update.
+- Breaking workflow change: the old sampler input names are no longer accepted; existing workflows must reconnect to the renamed inputs. The H3 TST patch node is unchanged.
 - Display the high-resolution socket directly below the low-resolution socket and preserve link targets when reordering restored root-graph inputs.
 - Use the selected high-resolution model's load device for its sampling stage and validate its sampler compatibility.
 - Document wiring, migration, shared-conditioning constraints, and verification limits in both READMEs.
