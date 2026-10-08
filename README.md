@@ -1,10 +1,21 @@
 # selflift-Avatar
 
-**Development: `main` (model input naming and layout)** · **Packaged release: `v0.1.4-experimental`** · [中文说明](README_CN.md) · [Changelog](CHANGELOG.md) · [v0.1.4 release](https://github.com/slmonker/selflift-Avatar/releases/tag/v0.1.4-experimental)
+**Development: `main` (tiling stale-reference fix)** · **Packaged release: `v0.1.4-experimental`** · [中文说明](README_CN.md) · [Changelog](CHANGELOG.md) · [v0.1.4 release](https://github.com/slmonker/selflift-Avatar/releases/tag/v0.1.4-experimental)
 
 An independent experimental SelfLift branch for ComfyUI / MiniMax H3. It focuses on H3 audio-video latent masks, preserving source audio during sampling, and a narrowly supported high-resolution tiling path. It registers separate node IDs, so it can coexist with the original SelfLift plugin.
 
-> **Experimental, unofficial project.** The current code has passed 53 CPU tests and two frontend suites with stubs. Earlier versions were exercised in the maintainer's H3 workflow; the new controls still need broader real-model and frontend testing. This is not a systematic benchmark of lip-sync accuracy, speed, or every model/plugin combination. Results can vary by character, audio, prompt, sampler, latent upscaler, and seed.
+> **Experimental, unofficial project.** The current code has passed 57 CPU tests and two frontend suites with stubs. Earlier versions were exercised in the maintainer's H3 workflow; the new controls still need broader real-model and frontend testing. This is not a systematic benchmark of lip-sync accuracy, speed, or every model/plugin combination. Results can vary by character, audio, prompt, sampler, latent upscaler, and seed.
+
+## Main-branch fix: expired model references during tiling (2026-10-09)
+
+Fixes `AttributeError: 'NoneType' object has no attribute 'model'` in `SelfLiftAvatarH3Sampler` while preparing high-resolution spatial tiling.
+
+- **Trigger:** with `highres_tiling` enabled, the workspace estimator encounters an expired model reference in ComfyUI's loaded-model list. Both automatic and manual tiling use this estimator. An interrupted run followed by another run and garbage collection preceded the reported failure, but interruption does not always trigger it; the log does not identify the expired object.
+- **Fix:** skip empty entries and expired wrapped model references when counting reclaimable memory. Live-model accounting, deduplication, device filtering, sampling, masks and tile-selection logic are unchanged. This is a stale-reference crash, not evidence of damaged model files or an out-of-memory error.
+- **Update:** update to the current `main` branch and restart the ComfyUI backend; refreshing the browser alone does not reload Python code. No parameter changes are needed for this fix. Users upgrading from the packaged release must also follow the existing model-input migration instructions below.
+- **Validation:** 57 CPU tests pass, including four new regression tests for empty/expired references, mixed live entries, memory accounting and bounds. Both stub-frontend suites pass. Full GPU generation after this fix has not been verified; it does not guarantee against unrelated failures or OOM.
+
+This fix is available on `main` only. The existing `v0.1.4-experimental` release archive is unchanged and does **not** include it.
 
 ## Main-branch update: model input naming and layout (2026-10-05)
 

@@ -226,7 +226,12 @@ def _available_workspace(model):
     reclaimable = 0
     seen = set()
     for loaded in manager.loaded_models():
+        # Model-manager weak references can expire between sampling stages.
+        if loaded is None:
+            continue
         patcher = loaded if callable(getattr(loaded, "loaded_size", None)) else loaded.model
+        if patcher is None:
+            continue
         load_device = getattr(patcher, "load_device", None)
         identity = id(patcher.model)
         if load_device == model.load_device and identity not in seen:

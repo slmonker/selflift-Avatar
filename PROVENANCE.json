@@ -15,12 +15,12 @@
     "avatar_masks.py": "8c96af33ced2e8c4a7fd0c9160babfa002e9f255e182205d004035e2692b70a7",
     "avatar_sampling.py": "d4540a6e01ca79aca9b5e009a81fedb60d508eaa45f7fc297ca52d2055137e90",
     "diagnostics.py": "a4a81b2ddc6a2f8b4cf6be040c184e0b0b848513ed21a332a7169215f5f55641",
-    "h3_tiling.py": "b9e81dc4b1827798cb9d2cefb6a40878edb89e949f9fd8dcde1a503988d51b3e",
+    "h3_tiling.py": "a00a7c103b676ca260dc868600a564566171872378d795e7346f87454ad1428e",
     "h3_tst.py": "20fd3def8a1d172abb2ee2563ef5f83af28d006300f43a92d1abef244651af13",
     "h3_upscaler.py": "63d0683e04ed81dbfb2fcc6a61fa55cf742d6c04a87455fbf1f2353b1239322a",
     "nodes.py": "64c2f6e9e9635a7bb55b4f29a7ea37d6a3045ab7cf0729b6f55ad1237584f826",
     "selflift.py": "e38aa972b9bd6044aa28bf468018984ec7ac886e7aeb615dbd49c16cd779b26e",
-    "tests/test_avatar.py": "bf4f9c75dee08ca680be726b37c91f50a7afd34a4bae0ae44896460eafa169a3",
+    "tests/test_avatar.py": "60e19321df037964923c6563290e623147f6589d93e51f64535ba7200d89f237",
     "tiling_ui.py": "5d9ec8fb946809021e8b8c64bff275eeda2b507f7e2bacce06977509ed974f0c"
   },
   "published_frontend_sha256": {

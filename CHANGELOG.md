@@ -1,5 +1,12 @@
 # Changelog
 
+## Main branch — 2026-10-09 (not yet packaged)
+
+- Fix high-resolution tiling workspace estimation crashing on `None` entries or expired wrapped model references in ComfyUI's loaded-model list.
+- Preserve live-model memory accounting, deduplication, device filtering and sampling/tiling behavior; do not force model unloading or garbage collection.
+- Document the trigger, interruption/retry observation, backend restart requirement and verification limits in both READMEs.
+- 57 CPU tests (four new regression tests) and both stub-frontend suites pass. Full GPU generation after this fix remains unverified; the v0.1.4 release archive is unchanged.
+
 ## Documentation correction — 2026-10-06
 
 - Clarify that dual-model sampling already existed through `model` / `model_hires`. The October 5 update renames and reorders those inputs, corrects high-resolution device selection, and adds validation/tests; it does not introduce dual-model sampling or forced unloading.

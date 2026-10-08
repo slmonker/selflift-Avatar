@@ -467,6 +467,43 @@ class TilingTests(unittest.TestCase):
         torch.testing.assert_close(out[0],v)
         torch.testing.assert_close(out[1],a)
 
+class TilingWorkspaceTests(unittest.TestCase):
+    def workspace(self, loaded, free=100, total=1000):
+        model = SimpleNamespace(load_device='cuda:0', model_size=lambda: 50)
+        manager = h3_tiling.comfy.model_management
+        with patch.object(manager, 'loaded_models', return_value=loaded), \
+             patch.object(manager, 'get_free_memory', return_value=free), \
+             patch.object(manager, 'get_total_memory', return_value=total), \
+             patch.object(manager, 'minimum_inference_memory', return_value=10), \
+             patch.object(manager, 'MIN_WEIGHT_MEMORY_RATIO', 0.5):
+            return h3_tiling._available_workspace(model)
+
+    def test_none_entries_are_skipped(self):
+        self.assertEqual(self.workspace([None, None]), 40)
+
+    def test_expired_loaded_model_is_skipped(self):
+        patcher = Patcher()
+        patcher.parent = None
+        loaded = h3_tiling.comfy.model_management.LoadedModel(patcher)
+        del patcher
+        self.assertIsNone(loaded.model)
+        self.assertEqual(self.workspace([loaded]), 40)
+
+    def test_live_models_deduplicated_and_other_devices_excluded(self):
+        patcher = SimpleNamespace(model=object(), load_device='cuda:0', loaded_size=lambda: 200)
+        clone = SimpleNamespace(model=patcher.model, load_device='cuda:0', loaded_size=lambda: 200)
+        other = SimpleNamespace(model=object(), load_device='cuda:1', loaded_size=lambda: 500)
+        for entries in ([None, patcher, clone, other, None],
+                        [SimpleNamespace(model=None), SimpleNamespace(model=patcher), clone, other]):
+            with self.subTest(entries=entries):
+                self.assertEqual(self.workspace(entries), 240)
+
+    def test_pool_capped_and_workspace_nonnegative(self):
+        patcher = SimpleNamespace(model=object(), load_device='cuda:0', loaded_size=lambda: 2000)
+        self.assertEqual(self.workspace([None, patcher]), 940)
+        self.assertEqual(self.workspace([None], free=0), 0)
+
+
 class TilingControlTests(unittest.TestCase):
     def plan(self, mode="auto", tiles=2, axis="auto", shape=(1,24,3,12,24), available=100):
         audio=(1,32,2,7)
