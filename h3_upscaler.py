@@ -45,6 +45,20 @@ def _temporal_windows(length, chunk, overlap):
         yield start, end, max(0, start - overlap), min(length, end + overlap)
 
 
+def _temporal_pad(x, overlap):
+    """Mirror-pad temporal halos without repeating H3's causal first frame."""
+    if overlap == 0:
+        return x
+    if overlap >= x.shape[2]:
+        logging.warning(
+            "[SelfLift upscaler] temporal overlap %d is not smaller than latent length %d; "
+            "falling back to replicate padding", overlap, x.shape[2])
+        mode = "replicate"
+    else:
+        mode = "reflect"
+    return F.pad(x, (0, 0, 0, 0, overlap, overlap), mode=mode)
+
+
 class AttnBlock3D(nn.Module):
     def __init__(self, in_channels):
         super().__init__()
@@ -177,7 +191,9 @@ class LatentResizer3D(nn.Module):
         if not enable_chunking or T <= chunk:
             return self._forward_seg(x, scale, size)
 
-        x_padded = F.pad(x, (0, 0, 0, 0, overlap, overlap), mode='replicate')
+        # Replicating the causal first latent frame creates a six-frame hold
+        # (five halo copies plus frame 0), which the 3D upscaler can turn into content.
+        x_padded = _temporal_pad(x, overlap)
 
         out_full = torch.zeros(B, C, T, size[-2], size[-1], device=x.device, dtype=x.dtype)
         weight_full = torch.zeros(1, 1, T, 1, 1, device=x.device, dtype=x.dtype)

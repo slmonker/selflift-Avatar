@@ -4,7 +4,7 @@
 
 An independent experimental SelfLift branch for ComfyUI / MiniMax H3. It focuses on H3 audio-video latent masks, preserving source audio during sampling, and high-resolution spatial tiling / global-context memory saving. It registers separate node IDs, so it can coexist with the original SelfLift plugin.
 
-> **Experimental, unofficial project.** The current code has passed 75 CPU tests and two frontend suites with stubs. Earlier versions were exercised in the maintainer's H3 workflow; the new controls still need broader real-model and frontend testing. This is not a systematic benchmark of lip-sync accuracy, speed, or every model/plugin combination. Results can vary by character, audio, prompt, sampler, latent upscaler, and seed.
+> **Experimental, unofficial project.** The current code has passed 80 CPU tests and two frontend suites with stubs. Earlier versions were exercised in the maintainer's H3 workflow; the new controls still need broader real-model and frontend testing. This is not a systematic benchmark of lip-sync accuracy, speed, or every model/plugin combination. Results can vary by character, audio, prompt, sampler, latent upscaler, and seed.
 
 ## Main-branch fix: expired model references during tiling (2026-10-09)
 
@@ -51,7 +51,7 @@ The separate H3 TST patch node still uses its original `model` socket. Socket or
 
 Both stages share the VAE, positive/negative conditioning, CFG, sampler and sigma schedule. Use compatible architectures, latent formats and sampling parameterizations, such as different checkpoints or LoRA stacks for the same backbone—not arbitrary model families. The switch follows the **resolution transition**, not an independent high-noise/low-noise threshold.
 
-**75 CPU tests** and both Node.js frontend suites pass. Coverage includes model selection, single-model fallback, stage boundaries, masks/tiling, socket ordering and preserving link targets when reordering. These are synthetic-denoiser and stub-frontend tests; real dual-model output quality, peak VRAM and all frontend/subgraph combinations remain unverified.
+**80 CPU tests** and both Node.js frontend suites pass. Coverage includes model selection, single-model fallback, stage boundaries, masks/tiling, socket ordering and preserving link targets when reordering. These are synthetic-denoiser and stub-frontend tests; real dual-model output quality, peak VRAM and all frontend/subgraph combinations remain unverified.
 
 This update is available from the repository's `main` branch. The existing `v0.1.4-experimental` release archive does **not** contain it; no new release archive is created with this update.
 
@@ -89,7 +89,7 @@ This update adds four high-resolution memory-saving modes: `spatial`, `global_st
 - If TST or another attention override is active, `global_stream`/`global_ram` fall back to full-sequence dense attention with chunked MLP. The override is preserved, but VRAM use is higher.
 - If the override is only ComfyUI's `Model Attention Backend` (for example comfy kitchen attention), the full-sequence fallback removes that backend selector and uses default PyTorch attention to avoid long-sequence backend instability. TST/Motion Context overrides are not removed.
 - The node status panel reports the actual mode, token chunk, fallback reason, and memory estimates. These are estimates, not measured peaks.
-- The current code passes 75 CPU tests plus both stub-frontend suites. Real H3 quality, speed, and VRAM peaks still need workflow-specific A/B testing.
+- The current code passes 80 CPU tests plus both stub-frontend suites. Real H3 quality, speed, and VRAM peaks still need workflow-specific A/B testing.
 
 ## Previous upgrade: v0.1.4
 
@@ -294,7 +294,7 @@ node tests/test_tiling_ui.mjs
 node tests/test_model_input_order.mjs
 ```
 
-The current suite contains 75 CPU tests covering AV packing, H3 audio scaling, full/partial masks, constant audio SolidMask conversion, native audio conditioning, two-stage sampling, automatic tile planning, tile stitching, complete-audio forwarding to every tile, invalid masked-tiling combinations, and the unmasked tiling path. The tests do not load a large H3 checkpoint or measure final video lip-sync quality.
+The current suite contains 80 CPU tests covering AV packing, H3 audio scaling, full/partial masks, constant audio SolidMask conversion, native audio conditioning, two-stage sampling, automatic tile planning, tile stitching, complete-audio forwarding to every tile, invalid masked-tiling combinations, and the unmasked tiling path. The tests do not load a large H3 checkpoint or measure final video lip-sync quality.
 
 ## Acknowledgements
 

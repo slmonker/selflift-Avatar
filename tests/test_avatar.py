@@ -19,7 +19,7 @@ spec = importlib.util.spec_from_file_location('selflift_avatar_test', PLUGIN/'__
 plugin = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = plugin
 spec.loader.exec_module(plugin)
-from selflift_avatar_test import nodes, avatar_masks as masks, selflift, avatar_sampling, h3_tiling, h3_global_tiling, h3_output_chunking
+from selflift_avatar_test import nodes, avatar_masks as masks, selflift, avatar_sampling, h3_tiling, h3_global_tiling, h3_output_chunking, h3_upscaler
 import torch
 import comfy.latent_formats
 import comfy.model_base
@@ -56,6 +56,74 @@ class Patcher:
         comfy.patcher_extension.add_wrapper_with_key(kind, key, wrapper, self.model_options, is_model_options=True)
     def get_model_object(self, key):
         return getattr(self.model, key)
+
+class UpscalerTemporalPaddingTests(unittest.TestCase):
+    def test_reflect_padding_does_not_repeat_first_frame(self):
+        x = torch.arange(1, 41, dtype=torch.float32).reshape(1, 1, 40, 1, 1)
+        padded = h3_upscaler._temporal_pad(x, 5)
+
+        self.assertEqual(padded.shape[2], 50)
+        torch.testing.assert_close(
+            padded[:, :, :5], x[:, :, torch.arange(5, 0, -1)])
+        torch.testing.assert_close(
+            padded[:, :, -5:], x[:, :, torch.arange(38, 33, -1)])
+        self.assertEqual((padded == x[:, :, :1]).sum().item(), 1)
+
+    def test_oversized_overlap_preserves_replicate_fallback(self):
+        x = torch.arange(1, 6, dtype=torch.float32).reshape(1, 1, 5, 1, 1)
+        with self.assertLogs(level="WARNING"):
+            padded = h3_upscaler._temporal_pad(x, 5)
+
+        self.assertEqual(padded.shape[2], 15)
+        torch.testing.assert_close(padded[:, :, :5], x[:, :, :1].expand_as(padded[:, :, :5]))
+
+    def test_long_latent_forward_uses_reflect_halo(self):
+        model = h3_upscaler.LatentResizer3D(
+            in_channels=1, in_blocks=1, out_blocks=1, channels=32,
+            dropout=0, attn=False, temporal_every=1, temporal_kernel=5)
+        x = torch.zeros(1, 1, 33, 1, 1)
+
+        with patch.object(h3_upscaler.F, "pad", wraps=h3_upscaler.F.pad) as pad:
+            out = model(x, target_size=(33, 2, 2))
+
+        self.assertEqual(out.shape, (1, 1, 33, 2, 2))
+        self.assertTrue(torch.isfinite(out).all())
+        pad.assert_called_once()
+        self.assertEqual(pad.call_args.kwargs["mode"], "reflect")
+
+    def test_short_latent_forward_does_not_pad(self):
+        model = h3_upscaler.LatentResizer3D(
+            in_channels=1, in_blocks=1, out_blocks=1, channels=32,
+            dropout=0, attn=False, temporal_every=1, temporal_kernel=5)
+        x = torch.zeros(1, 1, 32, 1, 1)
+
+        with patch.object(h3_upscaler.F, "pad", wraps=h3_upscaler.F.pad) as pad:
+            out = model(x, target_size=(32, 2, 2))
+
+        self.assertEqual(out.shape, (1, 1, 32, 2, 2))
+        pad.assert_not_called()
+
+    def test_reflect_only_changes_long_latent_end_windows(self):
+        torch.manual_seed(7)
+        model = h3_upscaler.LatentResizer3D(
+            in_channels=1, in_blocks=1, out_blocks=1, channels=32,
+            dropout=0, attn=False, temporal_every=1, temporal_kernel=5)
+        x = torch.randn(1, 1, 107, 1, 1)
+
+        with torch.no_grad():
+            reflect = model(x, target_size=(107, 2, 2))
+            original_pad = h3_upscaler._temporal_pad
+            h3_upscaler._temporal_pad = lambda z, overlap: h3_upscaler.F.pad(
+                z, (0, 0, 0, 0, overlap, overlap), mode="replicate")
+            try:
+                replicate = model(x, target_size=(107, 2, 2))
+            finally:
+                h3_upscaler._temporal_pad = original_pad
+
+        self.assertFalse(torch.equal(reflect[:, :, 0], replicate[:, :, 0]))
+        torch.testing.assert_close(
+            reflect[:, :, 37:91], replicate[:, :, 37:91],
+            rtol=0, atol=0)
 
 class MaskTests(unittest.TestCase):
     def setUp(self):
