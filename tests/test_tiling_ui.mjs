@@ -6,7 +6,13 @@ const events = new Map();
 let node;
 globalThis.testApp = {registerExtension: (e) => {extension=e;},graph:{getNodeById:(id)=>String(id)==='78'?node:null}};
 globalThis.testApi = {addEventListener:(name,fn)=>events.set(name,fn)};
-globalThis.document = {createElement:()=>({style:{},setAttribute(){},value:'',readOnly:false})};
+const fakeContext = {
+    clearRect(){}, fillRect(){}, fillText(){}, beginPath(){}, moveTo(){}, lineTo(){}, stroke(){}
+};
+globalThis.document = {createElement:()=>({
+    style:{},setAttribute(){},value:'',readOnly:false,width:0,height:0,
+    getContext:()=>fakeContext,
+})};
 const source = (await fs.readFile(new URL('../web/tiling_controls.js',import.meta.url),'utf8'))
   .replace('import { app } from "../../scripts/app.js";', 'const app=globalThis.testApp;')
   .replace('import { api } from "../../scripts/api.js";', 'const api=globalThis.testApi;');
@@ -25,6 +31,7 @@ await extension.beforeRegisterNodeDef(Node,{name:'SelfLiftAvatarH3Sampler'});
 extension.setup();node=new Node();node.onNodeCreated();
 assert.equal(node.selfliftTilingPanel.readOnly,true);
 assert.equal(node.widgets.at(-1).options.serialize,false);
+assert.ok(node.selfliftSeamCanvas);
 assert.match(node.selfliftTilingPanel.value,/Not run/);
 node.widgets[1].value='manual';node.widgets[1].callback();
 assert.match(node.selfliftTilingPanel.value,/manual/);
@@ -84,3 +91,29 @@ node.widgets[0].value=false; node.widgets[0].callback();
 assert.equal(widget('highres_tiling_mode').type, 'selflift-hidden');
 console.log('Automatic actual-count tests passed (live, complete, reset, cached text, numeric node ID, single tile).');
 console.log('Global-context frontend checks passed (mode, status, control visibility).');
+// Experimental spatial-anchor node gets the same plan panel and its extra controls.
+class SpatialAnchorNode extends Node {
+    constructor(){
+        super();
+        this.widgets.push({name:'spatial_anchor',value:'lowres_global'},
+                          {name:'tiling_overlap',value:6});
+    }
+}
+await extension.beforeRegisterNodeDef(SpatialAnchorNode,{name:'SelfLiftAvatarH3SpatialAnchoredSampler'});
+const spatialAnchorNode = new SpatialAnchorNode();
+spatialAnchorNode.onNodeCreated();
+assert.match(spatialAnchorNode.selfliftTilingPanel.value,/anchor=lowres_global/);
+assert.match(spatialAnchorNode.selfliftTilingPanel.value,/overlap=6/);
+assert.match(spatialAnchorNode.selfliftTilingPanel.value,/spatial/);
+assert.ok(spatialAnchorNode.selfliftSeamCanvas);
+spatialAnchorNode.onExecuted({
+    selflift_tiling:['DONE | seam diag'],
+    selflift_seam_diag:[{
+        axis:'W', length:24,
+        regions:[[0,12],[10,24]],
+        seams:[{boundary:1,cut:11,overlap:2,relative_diff:0.12}],
+    }],
+});
+assert.equal(spatialAnchorNode.selfliftSeamData.seams.length,1);
+assert.equal(spatialAnchorNode.selfliftSeamData.seams[0].relative_diff,0.12);
+console.log('Spatial-anchor frontend checks passed (separate node, plan panel, anchor/overlap summary, seam diagram).');

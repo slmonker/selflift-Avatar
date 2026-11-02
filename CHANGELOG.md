@@ -1,5 +1,15 @@
 # Changelog
 
+## Main branch — 2026-11-02
+
+- Merge the full-frame low-resolution anchor, content-aware cut placement and seam diagnostics into the original `SelfLiftAvatarH3Sampler` spatial path without adding new node options.
+- Add an independent spatial-anchor TEST node for A/B control (`spatial_anchor=off`).
+- Fix the H3 reference payload to include `ref_audio_t=0` for the uncropped low-resolution video reference.
+- Fix plan serialization for the ComfyUI WebSocket UI by excluding internal content-state objects.
+- Add a compact seam diagram to the existing tiling status panel and emit per-seam `relative_diff` diagnostics.
+- 94 CPU tests and both frontend suites pass.
+- Special thanks to [hashu786/ComfyUI-Tessera](https://github.com/hashu786/ComfyUI-Tessera) for the inspiration around anchoring every tile to the same ground truth and treating tile/seam diagnostics as first-class engineering signals. The implementation here is adapted to SelfLift Avatar and does not copy Tessera code.
+
 ## Main branch — 2026-10-25 (not yet packaged)
 
 - Fix the MiniMax H3 latent upscaler inventing frame-0 content in long clips (`T > 32` latent frames): temporal chunk halos now use `reflect` padding instead of repeating the causal first frame.

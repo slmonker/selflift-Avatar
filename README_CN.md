@@ -4,7 +4,7 @@
 
 这是一个面向 ComfyUI / MiniMax H3 的 SelfLift 独立实验分支，重点处理 H3 音视频 latent 遮罩、采样过程中的原始音频保留，以及高分辨率空间分块 / 全局上下文省显存。它使用独立的节点 ID，可以和原版 SelfLift 共存。
 
-> **实验版本，非官方项目。** 当前代码已通过 80 项 CPU 测试和两套模拟前端测试。此前版本已在维护者的 H3 工作流中试用；新控件仍需更多真实模型与前端测试。尚未进行系统性的口型准确率、速度和所有模型/插件组合测试。不同角色、音频、提示词、采样器、latent upscaler 和 seed 可能产生不同结果。
+> **实验版本，非官方项目。** 当前代码已通过 94 项 CPU 测试和两套模拟前端测试。此前版本已在维护者的 H3 工作流中试用；新控件仍需更多真实模型与前端测试。尚未进行系统性的口型准确率、速度和所有模型/插件组合测试。不同角色、音频、提示词、采样器、latent upscaler 和 seed 可能产生不同结果。
 
 ## 主分支修复：长视频 latent upscaler 首帧伪影（2026-10-25）
 
@@ -15,7 +15,7 @@
 - **修复方式：**时间 halo 改用 `reflect` padding。对于极少数自定义 upscaler 模型，如果时间 overlap 不小于 latent 长度、无法使用 reflect，则保留原来的 `replicate` 回退，避免新增报错。
 - **兼容范围：**`T <= 32` 的短片仍走原来的无 padding 路径。长视频只可能改变最前和最后的时间窗口；这些窗口之外的中间帧逐元素保持不变。音频、遮罩、分块、采样、节点接口和前端行为均未修改。
 - **更新方法：**更新到当前 `main` 分支并重启 ComfyUI 后端，无需修改工作流或参数。
-- **验证范围：**80 项 CPU 测试及两套前端测试通过。新增 5 项回归测试，覆盖 reflect padding、短片无 padding 路径、overlap 过大回退、长视频边界行为和中间帧不变。使用真实 `minimax_h3_latent_upscaler_3d_conv_v1_bf16` 做 A/B：合成输入的首帧残差最大值从 `replicate` 的 13.46 降至 `reflect` 的 1.01，不分块参考值为 0.92。报告者提供的同 seed 前后对比图也显示符号状条块消失。
+- **验证范围：**94 项 CPU 测试及两套前端测试通过。新增 5 项回归测试，覆盖 reflect padding、短片无 padding 路径、overlap 过大回退、长视频边界行为和中间帧不变。使用真实 `minimax_h3_latent_upscaler_3d_conv_v1_bf16` 做 A/B：合成输入的首帧残差最大值从 `replicate` 的 13.46 降至 `reflect` 的 1.01，不分块参考值为 0.92。报告者提供的同 seed 前后对比图也显示符号状条块消失。
 
 本修复已在 `main` 提供，并包含当前开发版。已打包的 `v0.1.4-experimental` 压缩包保持不变，**不包含此修复**。
 
@@ -64,7 +64,7 @@
 
 两个阶段共享 VAE、正负条件、CFG、采样器和 sigma 日程。模型必须具有兼容的架构、latent 格式和采样参数化，适合同架构的不同权重或 LoRA 组合，不支持任意模型家族混用。模型切换跟随**分辨率提升边界**，不是独立设置的高噪 / 低噪阈值。
 
-**80 项 CPU 测试**和两套 Node.js 前端测试通过，覆盖模型选择、单模型回退、阶段边界、遮罩与分块、接口排序及重排后的连线目标保持。这些是合成去噪器和模拟前端测试；双真实模型的输出质量、显存峰值及全部前端 / 子图组合仍待验证。
+**94 项 CPU 测试**和两套 Node.js 前端测试通过，覆盖模型选择、单模型回退、阶段边界、遮罩与分块、接口排序及重排后的连线目标保持。这些是合成去噪器和模拟前端测试；双真实模型的输出质量、显存峰值及全部前端 / 子图组合仍待验证。
 
 本次更新位于仓库 `main` 分支；已有的 `v0.1.4-experimental` 发布压缩包**不包含本次修改**，本次没有创建新的 Release 压缩包。
 
@@ -102,7 +102,7 @@
 - 检测到 TST 或其他 attention override 时，`global_stream` / `global_ram` 会自动回退到“全序列 dense attention + 分块 MLP”，保留 override，但显存占用更高。
 - 如果 override 只是 ComfyUI 的 `Model Attention Backend`（例如 comfy kitchen attention），全序列回退会移除这个后端选择，改用默认 PyTorch attention，避免长序列下后端不兼容导致异常噪点。TST / Motion Context 等真正改变 attention 语义的 override 不会被移除。
 - 节点状态栏会显示实际模式、token chunk、回退原因和显存估算；这些数字是估算值，不是实测峰值。
-- 当前代码通过 80 项 CPU 测试及两套模拟前端测试；真实 H3 模型的质量、速度和显存峰值仍需按工作流做 A/B。
+- 当前代码通过 94 项 CPU 测试及两套模拟前端测试；真实 H3 模型的质量、速度和显存峰值仍需按工作流做 A/B。
 
 ## 历史升级：v0.1.4
 
@@ -213,10 +213,29 @@ git pull --ff-only
 | 节点 ID | 显示名称 |
 | --- | --- |
 | `SelfLiftAvatarH3Sampler` | selflift-Avatar Sampler (MiniMax H3) |
+| `SelfLiftAvatarH3SpatialAnchoredSampler` | **测试节点：** selflift-Avatar Spatial Anchor (TEST) |
 | `SelfLiftAvatarImageSampler` | selflift-Avatar Sampler (Image) |
 | `SelfLiftAvatarH3TST` | selflift-Avatar H3 TST |
 
 采样器使用标准的 `sampler` 和 `sigmas` 输入。请使用标准 Euler，并保持 `s_churn=0`。
+
+## 测试节点：空间分块 + 全帧低清锚定
+
+`SelfLiftAvatarH3Sampler` 的 `spatial` 模式现已默认启用全帧低清锚定、内容感知切线和接缝诊断；节点接口和已有参数保持不变。
+
+`SelfLiftAvatarH3SpatialAnchoredSampler` 仍保留为独立测试/A-B 节点：它可以把 `spatial_anchor` 切到 `off`，用于对比旧的纯 spatial 行为。
+
+它只走 `spatial` 路径，但会自动把低分辨率阶段的全帧结果追加为一份
+不按 tile 裁切的 H3 视频参考，让每个高分辨率条带都看到同一份全局构图。
+它还提供显式的 `tiling_overlap`（patch 单位）和 2 / 3 / 4 / 6 / 8 条带
+选择；建议先用 2 或 3 条，只有在 OOM 时才增加条带数。
+
+`lowres_global` 还会自动根据低清阶段的画面梯度调整切线，尽量避开人物和强结构线。采样时会在控制台记录每条接缝的 `relative_diff`，并在 TEST 节点的计划面板下方绘制一张示意接缝图：绿色表示相邻条带在重叠区较一致，黄色表示需要关注，红色表示差异较大。它是“内容一致性预警”，不是最终画质评分，仍需用相同 seed 的 A/B 视频确认。
+
+推荐 A/B 时固定模型、提示词、音频、帧数、FPS、seed、sigmas、
+`transition_step`、`lowres_scale` 和 `upscaler_model`，只切换采样器节点或
+`spatial_anchor` / `tiling_tiles` / `tiling_overlap`。这是推理路径实验，
+不训练底模，也不改变原有节点行为。
 
 ## 音频驱动 H3 工作流
 
@@ -309,11 +328,13 @@ node tests/test_tiling_ui.mjs
 node tests/test_model_input_order.mjs
 ```
 
-当前共有 80 项 CPU 测试，覆盖音视频打包、H3 音频尺度、全量/局部遮罩、恒定音频 SolidMask 转换、原生音频条件、两阶段采样、自动分块规划、分块拼接、每个分块获得完整音频、非法遮罩组合和无遮罩分块路径。测试不会加载大型 H3 权重，也不衡量最终视频的口型质量。
+当前共有 94 项 CPU 测试，覆盖音视频打包、H3 音频尺度、全量/局部遮罩、恒定音频 SolidMask 转换、原生音频条件、两阶段采样、自动分块规划、分块拼接、每个分块获得完整音频、非法遮罩组合和无遮罩分块路径。测试不会加载大型 H3 权重，也不衡量最终视频的口型质量。
 
 ## 致谢
 
 感谢 [Fish4AI](https://github.com/Fish4AI) 的 [comfyui-SelfLift-Fish](https://github.com/Fish4AI/comfyui-SelfLift-Fish)。本项目的全局上下文省显存实现，包括 `h3_global_tiling.py`、`h3_stream_attention.py`、`h3_ram_attention.py`、`h3_output_chunking.py`、`h3_prepared_weights.py`，基于 Fish4AI 的公开工作移植并适配到 selflift-Avatar 的音频/视频 mask 路径。也感谢 facok 的原版 comfyui-SelfLift 和 SelfLift 论文作者。
+
+空间分块的全帧低清锚定、内容感知切线和接缝诊断方向受到 [hashu786/ComfyUI-Tessera](https://github.com/hashu786/ComfyUI-Tessera) 的启发，尤其是“每个 tile 都锚定同一份全局真相”和“把 tile/接缝诊断作为一等工程信号”的思路。本项目没有复制 Tessera 代码；实现已适配 SelfLift Avatar 的逐步条带融合和 H3 音视频路径。
 
 ## 来源与许可
 

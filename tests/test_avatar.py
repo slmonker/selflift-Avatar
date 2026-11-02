@@ -1,6 +1,7 @@
 """CPU tests: real ComfyUI packing/H3 scaling, synthetic denoiser (no weights)."""
 import copy
 import importlib.util
+import json
 import logging
 import os
 from pathlib import Path
@@ -19,9 +20,10 @@ spec = importlib.util.spec_from_file_location('selflift_avatar_test', PLUGIN/'__
 plugin = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = plugin
 spec.loader.exec_module(plugin)
-from selflift_avatar_test import nodes, avatar_masks as masks, selflift, avatar_sampling, h3_tiling, h3_global_tiling, h3_output_chunking, h3_upscaler
+from selflift_avatar_test import nodes, avatar_masks as masks, selflift, avatar_sampling, h3_tiling, h3_global_tiling, h3_output_chunking, h3_upscaler, spatial_anchor
 import torch
 import comfy.latent_formats
+import comfy.ldm.minimax.model
 import comfy.model_base
 import comfy.model_sampling
 import comfy.samplers
@@ -237,7 +239,7 @@ class MaskTests(unittest.TestCase):
         self.assertEqual(out.shape, self.v.shape)
         self.assertTrue(torch.isfinite(out).all())
     def test_unique_registration(self):
-        self.assertEqual(set(plugin.NODE_CLASS_MAPPINGS), {'SelfLiftAvatarH3Sampler','SelfLiftAvatarImageSampler','SelfLiftAvatarH3TST'})
+        self.assertEqual(set(plugin.NODE_CLASS_MAPPINGS), {'SelfLiftAvatarH3Sampler','SelfLiftAvatarH3SpatialAnchoredSampler','SelfLiftAvatarImageSampler','SelfLiftAvatarH3TST'})
         for cls in plugin.NODE_CLASS_MAPPINGS.values():
             self.assertEqual(cls.CATEGORY, 'selflift-Avatar')
             model_input = 'model' if cls is nodes.SelfLiftAvatarH3TST else 'low_res_model'
@@ -489,6 +491,33 @@ class PipelineTests(unittest.TestCase):
         am = torch.zeros_like(self.a); am[...,-1] = 1
         with self.assertRaisesRegex(ValueError,'partial audio'):
             self.run_pipeline(NestedTensor([torch.ones_like(self.v),am]),tiling=True)
+    def test_spatial_anchor_is_injected_into_high_stage(self):
+        anchor_conditioning = [[torch.zeros(1, 2, 4), {"minimax_refs": []}]]
+        with patch.object(nodes.spatial_anchor_utils, "append_global_video_reference",
+                          return_value=anchor_conditioning) as append_anchor:
+            self.run_pipeline(
+                NestedTensor([torch.ones_like(self.v), torch.zeros_like(self.a)]),
+                tiling=True, spatial_anchor_mode="lowres_global",
+                tiling_mode="manual", tiling_tiles=2, tiling_overlap=6,
+            )
+        append_anchor.assert_called_once()
+        anchor_latent = append_anchor.call_args.args[1]
+        self.assertEqual(anchor_latent.ndim, 5)
+        self.assertEqual(len(self.tile_inputs), 4)
+
+    def test_spatial_anchor_returns_seam_diagnostics(self):
+        diagnostics = {}
+        self.run_pipeline(
+            NestedTensor([torch.ones_like(self.v), torch.zeros_like(self.a)]),
+            tiling=True, spatial_anchor_mode="lowres_global",
+            tiling_mode="manual", tiling_tiles=2, tiling_overlap=6,
+            diagnostics_out=diagnostics,
+        )
+        self.assertIn(diagnostics["axis"], ("H", "W"))
+        self.assertEqual(len(diagnostics["regions"]), 2)
+        self.assertEqual(len(diagnostics["seams"]), 1)
+        self.assertIn("relative_diff", diagnostics["seams"][0])
+
     def test_global_mode_accepts_partial_masks_and_reports_plan(self):
         # Spatial tiling rejects this; full-sequence global context must accept it.
         am = torch.zeros_like(self.a); am[...,-1] = 1
@@ -798,6 +827,127 @@ class TilingTests(unittest.TestCase):
         torch.testing.assert_close(out[0],v)
         torch.testing.assert_close(out[1],a)
 
+class SpatialAnchorTests(unittest.TestCase):
+    def test_append_global_reference_is_non_mutating_and_uncropped(self):
+        embedding = torch.zeros(1, 4, 8)
+        original_ref = {"kind": "image", "latent": torch.zeros(1, 16, 1, 2, 2)}
+        conditioning = [[embedding, {"minimax_refs": [original_ref], "keep": 7}]]
+        latent = torch.zeros(1, 16, 3, 4, 5)
+
+        out = spatial_anchor.append_global_video_reference(conditioning, latent)
+
+        self.assertEqual(len(conditioning[0][1]["minimax_refs"]), 1)
+        self.assertEqual(conditioning[0][1]["keep"], 7)
+        self.assertEqual(len(out[0][1]["minimax_refs"]), 2)
+        self.assertIs(out[0][1]["minimax_refs"][0], original_ref)
+        ref = out[0][1]["minimax_refs"][1]
+        self.assertEqual(ref["kind"], "video")
+        self.assertEqual((ref["latent_t"], ref["latent_h"], ref["latent_w"]), (3, 4, 5))
+        self.assertEqual(ref["ref_audio_t"], 0)
+        self.assertIs(ref["latent"], latent)
+
+    def test_global_reference_builds_native_h3_layout(self):
+        conditioning = [[torch.zeros(1, 4, 8), {}]]
+        latent = torch.zeros(1, 16, 3, 4, 5)
+        out = spatial_anchor.append_global_video_reference(conditioning, latent)
+        layout = comfy.ldm.minimax.model.PackedLayout(
+            4, 3, 4, 5, 2, refs=out[0][1]["minimax_refs"])
+        self.assertGreater(layout.seq_len, 0)
+        self.assertIn("ref_img", [segment[2] for segment in layout.segments])
+
+    def test_bad_anchor_shape_fails_before_sampling(self):
+        with self.assertRaises(ValueError):
+            spatial_anchor.append_global_video_reference([], torch.zeros(1, 16, 4, 5))
+
+    def test_explicit_overlap_widens_regions(self):
+        default = h3_tiling._regions(120, 2)
+        wider = h3_tiling._regions(120, 2, overlap=8)
+        self.assertGreater(wider[0][1] - wider[0][0], default[0][1] - default[0][0])
+        self.assertLess(wider[1][0], default[1][0])
+
+    def test_content_scores_cover_both_axes(self):
+        video = torch.zeros(1, 16, 2, 8, 10)
+        video[..., :, 2:6] = 1.0
+        scores = h3_tiling.content_scores(video)
+        self.assertEqual(scores["H"].shape, (8,))
+        self.assertEqual(scores["W"].shape, (10,))
+        self.assertTrue(torch.isfinite(scores["H"]).all())
+        self.assertTrue(torch.isfinite(scores["W"]).all())
+
+    def test_content_aware_cut_avoids_high_energy_line(self):
+        scores = torch.zeros(120)
+        scores[56:65] = 10.0
+        regions = h3_tiling._content_aware_regions(
+            120, tile_count=2, overlap=6, scores=scores)
+        seam_center = (regions[0][1] + regions[1][0]) // 2
+        self.assertGreater(abs(seam_center - 60), 4)
+
+    def test_content_state_survives_model_option_copy(self):
+        state = h3_tiling.SpatialContentState()
+        state.axis_scores = {"H": torch.zeros(4), "W": torch.zeros(5)}
+        self.assertIs(copy.deepcopy(state), state)
+
+    def test_ui_plan_excludes_internal_content_state(self):
+        plan = {
+            "mode": "manual", "tiles": 2, "axis": 4,
+            "content_state": h3_tiling.SpatialContentState(),
+            "_regions_logged": True,
+        }
+        public = h3_tiling._plan_for_ui(plan)
+        self.assertNotIn("content_state", public)
+        self.assertNotIn("_regions_logged", public)
+        json.dumps(public)  # Must be safe for the ComfyUI WebSocket sender.
+
+    def test_content_aware_plan_logs_split_and_seam_diagnostics(self):
+        video = torch.ones(1, 24, 3, 12, 24)
+        audio = torch.ones(1, 32, 2, 7)
+        state = h3_tiling.SpatialContentState()
+        state.axis_scores = {
+            "H": torch.zeros(12),
+            "W": torch.zeros(24),
+        }
+        plan = {"tiles": 2, "axis": 4, "overlap": 4, "content_state": state}
+        with self.assertLogs(level="INFO") as logs:
+            h3_tiling._tiled_forward(
+                lambda streams, *args, **kwargs: [streams[0] * 2, streams[1] * 2],
+                [video, audio], torch.tensor([500.]), torch.zeros(1, 2, 4), {},
+                plan=plan,
+            )
+        text = "\n".join(logs.output)
+        self.assertIn("content-aware split", text)
+        self.assertIn("seam diag", text)
+        self.assertTrue(plan["_seam_diag_logged"])
+        self.assertEqual(len(state.seam_metrics), 1)
+        self.assertEqual(state.seam_metrics[0]["axis"], "W")
+        self.assertIn("relative_diff", state.seam_metrics[0])
+
+    def test_test_node_schema_is_separate_and_spatial_only(self):
+        original = nodes.SelfLiftAvatarH3Sampler.INPUT_TYPES()
+        test_node = nodes.SelfLiftAvatarH3SpatialAnchoredSampler.INPUT_TYPES()
+        self.assertEqual(original["optional"]["highres_tiling_mode"][0],
+                         ["spatial", "global_stream", "global", "global_ram"])
+        self.assertEqual(test_node["optional"]["highres_tiling_mode"][0], ["spatial"])
+        self.assertEqual(test_node["optional"]["spatial_anchor"][1]["default"], "lowres_global")
+        self.assertEqual(test_node["optional"]["tiling_tiles"][0], [2, 3, 4, 6, 8])
+        self.assertEqual(test_node["optional"]["tiling_overlap"][1]["default"], 6)
+
+    def test_test_node_forwards_anchor_and_overlap_to_engine(self):
+        output = {"samples": torch.zeros(1)}
+        with patch.object(nodes, "progressive_sample", return_value=output) as sample:
+            result = nodes.SelfLiftAvatarH3SpatialAnchoredSampler().sample(
+                low_res_model=None, positive=[], negative=[], vae=None,
+                latent_image={}, sampler=None, sigmas=None, seed=0, cfg=1.0,
+                transition_step=1, lowres_scale=0.5, rho=1.0, w_min=0.5, w_max=1.0,
+                upscaler_model="none", high_res_model=None, highres_tiling=True,
+                tiling_mode="manual", tiling_tiles=3, tiling_axis="width",
+                spatial_anchor="lowres_global", tiling_overlap=9, unique_id=None,
+            )
+        self.assertIs(sample.call_args.kwargs["spatial_anchor_mode"], "lowres_global")
+        self.assertEqual(sample.call_args.kwargs["tiling_overlap"], 9)
+        self.assertEqual(sample.call_args.kwargs["tiling_tiles"], 3)
+        self.assertIs(result["result"][0], output)
+
+
 class TilingWorkspaceTests(unittest.TestCase):
     def workspace(self, loaded, free=100, total=1000):
         model = SimpleNamespace(load_device='cuda:0', model_size=lambda: 50)
@@ -923,8 +1073,23 @@ class TilingControlTests(unittest.TestCase):
         self.assertEqual(kwargs['highres_tiling_mode'],'global_stream')
         self.assertEqual(kwargs['highres_token_chunk'],2048)
         self.assertEqual(kwargs['highres_weight_cache_gb'],2.0)
+        self.assertEqual(kwargs['spatial_anchor_mode'],'off')
+        self.assertIsNone(kwargs['tiling_overlap'])
         self.assertIn('Full sequence',result['ui']['selflift_tiling'][0])
         self.assertIn('full-sequence video/audio masks',result['ui']['selflift_tiling'][0])
+    def test_original_spatial_node_enables_anchor_and_diagnostics(self):
+        output = {'samples': torch.zeros(1)}
+        with patch.object(nodes, 'progressive_sample', return_value=output) as sample:
+            nodes.SelfLiftAvatarH3Sampler().sample(
+                None, [], [], None, output, None, None, 1, 1., 2, .5, .5, .5, 1., 'none',
+                highres_tiling=True, highres_tiling_mode='spatial',
+                tiling_mode='manual', tiling_tiles=2,
+            )
+        kwargs = sample.call_args.kwargs
+        self.assertEqual(kwargs['spatial_anchor_mode'], 'lowres_global')
+        self.assertEqual(kwargs['tiling_overlap'], 6)
+        self.assertIn('diagnostics_out', kwargs)
+
     def test_node_returns_latent_and_ui_with_default_options(self):
         output={'samples':torch.zeros(1)}
         with patch.object(nodes,'progressive_sample',return_value=output) as sample:

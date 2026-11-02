@@ -6,7 +6,7 @@ const source = (await fs.readFile(new URL('../web/model_input_order.js', import.
     .replace('import { app } from "../../scripts/app.js";', 'const app = globalThis.testModelOrderApp;');
 await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 const names = ['low_res_model', 'positive', 'negative', 'vae', 'latent_image', 'sampler', 'sigmas', 'high_res_model'];
-for (const type of ['SelfLiftAvatarH3Sampler', 'SelfLiftAvatarImageSampler']) {
+for (const type of ['SelfLiftAvatarH3Sampler', 'SelfLiftAvatarH3SpatialAnchoredSampler', 'SelfLiftAvatarImageSampler']) {
     class Node {
         constructor() { this.type = type; this.inputs = names.map(name => ({name, link: null})); }
         onNodeCreated() { this.originalCalled = true; return 42; }
@@ -37,4 +37,4 @@ for (const type of ['SelfLiftAvatarH3Sampler', 'SelfLiftAvatarImageSampler']) {
 class Other {}
 extension.beforeRegisterNodeDef(Other, {name: 'SelfLiftAvatarH3TST'});
 assert.equal(Other.prototype.onNodeCreated, undefined);
-console.log('Model input order checks passed: both samplers, new/restored nodes, preserved links (including ID 0), idempotence, unrelated nodes.');
+console.log('Model input order checks passed: all samplers, new/restored nodes, preserved links (including ID 0), idempotence, unrelated nodes.');

@@ -4,7 +4,7 @@
 
 An independent experimental SelfLift branch for ComfyUI / MiniMax H3. It focuses on H3 audio-video latent masks, preserving source audio during sampling, and high-resolution spatial tiling / global-context memory saving. It registers separate node IDs, so it can coexist with the original SelfLift plugin.
 
-> **Experimental, unofficial project.** The current code has passed 80 CPU tests and two frontend suites with stubs. Earlier versions were exercised in the maintainer's H3 workflow; the new controls still need broader real-model and frontend testing. This is not a systematic benchmark of lip-sync accuracy, speed, or every model/plugin combination. Results can vary by character, audio, prompt, sampler, latent upscaler, and seed.
+> **Experimental, unofficial project.** The current code has passed 94 CPU tests and two frontend suites with stubs. Earlier versions were exercised in the maintainer's H3 workflow; the new controls still need broader real-model and frontend testing. This is not a systematic benchmark of lip-sync accuracy, speed, or every model/plugin combination. Results can vary by character, audio, prompt, sampler, latent upscaler, and seed.
 
 ## Main-branch fix: long-clip latent upscaler frame-0 artifact (2026-10-25)
 
@@ -15,7 +15,7 @@ Fixes [#5](https://github.com/slmonker/selflift-Avatar/issues/5): with a learned
 - **Fix:** temporal halos now use `reflect` padding. For unusual custom upscaler models where the temporal overlap is not smaller than the latent length, the previous `replicate` behavior remains as a fallback instead of raising.
 - **Compatibility:** clips with `T <= 32` keep the unchanged unpadded path. For long clips, only the first and last temporal windows can change; interior frames outside those windows are byte-for-byte unchanged. Audio, masks, tiling, sampling, node schemas and frontend behavior are not modified.
 - **Update:** update to the current `main` branch and restart the ComfyUI backend. No workflow or parameter change is required.
-- **Validation:** 80 CPU tests and both frontend suites pass. Five new regression tests cover reflect padding, the short-clip no-pad path, oversized-overlap fallback, long-clip boundary behavior and unchanged interior frames. A real `minimax_h3_latent_upscaler_3d_conv_v1_bf16` A/B reduced synthetic frame-0 residual max from 13.46 (`replicate`) to 1.01 (`reflect`), versus 0.92 for the full-sequence reference. The reporter's before/after images also show the glyph-like block removed at the same seed.
+- **Validation:** 94 CPU tests and both frontend suites pass. Five new regression tests cover reflect padding, the short-clip no-pad path, oversized-overlap fallback, long-clip boundary behavior and unchanged interior frames. A real `minimax_h3_latent_upscaler_3d_conv_v1_bf16` A/B reduced synthetic frame-0 residual max from 13.46 (`replicate`) to 1.01 (`reflect`), versus 0.92 for the full-sequence reference. The reporter's before/after images also show the glyph-like block removed at the same seed.
 
 This fix is available on `main` and is included in the current development branch. The packaged `v0.1.4-experimental` archive is unchanged and does **not** include it.
 
@@ -64,7 +64,7 @@ The separate H3 TST patch node still uses its original `model` socket. Socket or
 
 Both stages share the VAE, positive/negative conditioning, CFG, sampler and sigma schedule. Use compatible architectures, latent formats and sampling parameterizations, such as different checkpoints or LoRA stacks for the same backbone—not arbitrary model families. The switch follows the **resolution transition**, not an independent high-noise/low-noise threshold.
 
-**80 CPU tests** and both Node.js frontend suites pass. Coverage includes model selection, single-model fallback, stage boundaries, masks/tiling, socket ordering and preserving link targets when reordering. These are synthetic-denoiser and stub-frontend tests; real dual-model output quality, peak VRAM and all frontend/subgraph combinations remain unverified.
+**94 CPU tests** and both Node.js frontend suites pass. Coverage includes model selection, single-model fallback, stage boundaries, masks/tiling, socket ordering and preserving link targets when reordering. These are synthetic-denoiser and stub-frontend tests; real dual-model output quality, peak VRAM and all frontend/subgraph combinations remain unverified.
 
 This update is available from the repository's `main` branch. The existing `v0.1.4-experimental` release archive does **not** contain it; no new release archive is created with this update.
 
@@ -102,7 +102,7 @@ This update adds four high-resolution memory-saving modes: `spatial`, `global_st
 - If TST or another attention override is active, `global_stream`/`global_ram` fall back to full-sequence dense attention with chunked MLP. The override is preserved, but VRAM use is higher.
 - If the override is only ComfyUI's `Model Attention Backend` (for example comfy kitchen attention), the full-sequence fallback removes that backend selector and uses default PyTorch attention to avoid long-sequence backend instability. TST/Motion Context overrides are not removed.
 - The node status panel reports the actual mode, token chunk, fallback reason, and memory estimates. These are estimates, not measured peaks.
-- The current code passes 80 CPU tests plus both stub-frontend suites. Real H3 quality, speed, and VRAM peaks still need workflow-specific A/B testing.
+- The current code passes 94 CPU tests plus both stub-frontend suites. Real H3 quality, speed, and VRAM peaks still need workflow-specific A/B testing.
 
 ## Previous upgrade: v0.1.4
 
@@ -211,10 +211,17 @@ The original `comfyui-SelfLift` folder can remain installed; this project uses d
 | Node ID | Display name |
 | --- | --- |
 | `SelfLiftAvatarH3Sampler` | selflift-Avatar Sampler (MiniMax H3) |
+| `SelfLiftAvatarH3SpatialAnchoredSampler` | **test node:** selflift-Avatar Spatial Anchor (TEST) |
 | `SelfLiftAvatarImageSampler` | selflift-Avatar Sampler (Image) |
 | `SelfLiftAvatarH3TST` | selflift-Avatar H3 TST |
 
 The sampler uses the standard `sampler` and `sigmas` inputs. Use the standard Euler sampler with `s_churn=0`.
+
+### Spatial tiling refinement
+
+`SelfLiftAvatarH3Sampler` now enables the full-frame low-resolution anchor, content-aware cut placement, and seam diagnostics automatically when `highres_tiling_mode=spatial`. Existing node inputs and defaults are preserved. The low-resolution SelfLift endpoint is added as an uncropped H3 video reference for every high-resolution strip; the implementation still generates the character and background together rather than compositing separate regions.
+
+The TEST node remains available for A/B runs: setting `spatial_anchor=off` keeps the same strips and overlap but disables the anchor. During sampling, the console reports `relative_diff` for each seam, and the TEST/original spatial node panel shows a compact seam diagram after completion. Green means the adjacent predictions agree closely, yellow means caution, and red means the strips disagree enough to inspect the output. This is an early-warning diagnostic, not a final quality score.
 
 ## Audio-driven H3 workflow
 
@@ -307,11 +314,13 @@ node tests/test_tiling_ui.mjs
 node tests/test_model_input_order.mjs
 ```
 
-The current suite contains 80 CPU tests covering AV packing, H3 audio scaling, full/partial masks, constant audio SolidMask conversion, native audio conditioning, two-stage sampling, automatic tile planning, tile stitching, complete-audio forwarding to every tile, invalid masked-tiling combinations, and the unmasked tiling path. The tests do not load a large H3 checkpoint or measure final video lip-sync quality.
+The current suite contains 94 CPU tests covering AV packing, H3 audio scaling, full/partial masks, constant audio SolidMask conversion, native audio conditioning, two-stage sampling, automatic tile planning, tile stitching, complete-audio forwarding to every tile, invalid masked-tiling combinations, and the unmasked tiling path. The tests do not load a large H3 checkpoint or measure final video lip-sync quality.
 
 ## Acknowledgements
 
 Special thanks to [Fish4AI](https://github.com/Fish4AI) and [comfyui-SelfLift-Fish](https://github.com/Fish4AI/comfyui-SelfLift-Fish). The global-context memory-saving implementation in this project, including `h3_global_tiling.py`, `h3_stream_attention.py`, `h3_ram_attention.py`, `h3_output_chunking.py`, and `h3_prepared_weights.py`, is adapted from Fish4AI's public work and integrated with selflift-Avatar's audio/video mask path. Thanks also to facok for the original comfyui-SelfLift and to the SelfLift paper authors.
+
+The full-frame spatial anchor, content-aware cut placement and seam-diagnostic direction were inspired by [hashu786/ComfyUI-Tessera](https://github.com/hashu786/ComfyUI-Tessera), especially its principle of anchoring every tile to the same ground truth and treating tile/seam diagnostics as first-class engineering signals. No Tessera code was copied into this project; the implementation here is adapted to SelfLift Avatar's per-step strip blending and H3 audio-video path.
 
 ## Source and licensing
 

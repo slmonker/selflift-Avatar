@@ -1,6 +1,9 @@
 import { app } from "../../scripts/app.js";
 
-const SAMPLERS = new Set(["SelfLiftAvatarH3Sampler", "SelfLiftAvatarImageSampler"]);
+const SAMPLERS = new Set([
+    "SelfLiftAvatarH3Sampler", "SelfLiftAvatarH3SpatialAnchoredSampler",
+    "SelfLiftAvatarImageSampler",
+]);
 
 function orderModelInputs(node) {
     const inputs = node.inputs;
