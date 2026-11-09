@@ -203,7 +203,12 @@ def _tile_payload(payload, context, video, audio, axis, start, end):
     if payload.get("keyframes"):
         keyframes = []
         for keyframe in payload["keyframes"]:
-            latent = keyframe["latent"]
+            latent = keyframe.get("latent")
+            if latent is None:
+                # audio-only guide (MiniMaxH3AddGuide with no image): no video
+                # rows to crop, pass the anchor through untouched
+                keyframes.append(dict(keyframe))
+                continue
             if latent.shape[-2:] != (height, width):
                 raise ValueError("SelfLift: tiled H3 keyframes must match the target latent height and width")
             region = latent.narrow(axis, start, end - start)
@@ -211,7 +216,8 @@ def _tile_payload(payload, context, video, audio, axis, start, end):
                 region, (1, 2, 2)).contiguous()})
         tiled["keyframes"] = keyframes
         if not payload.get("refs"):
-            tiled["cond_video_latents"] = [keyframe["latent"] for keyframe in keyframes]
+            tiled["cond_video_latents"] = [keyframe["latent"] for keyframe in keyframes
+                                           if keyframe.get("latent") is not None]
     tile_height = end - start if axis == 3 else height
     tile_width = end - start if axis == 4 else width
     layout = _packed_layout((context.shape[1], video.shape[2], (tile_height + 1) // 2 * 2,
@@ -325,8 +331,13 @@ def _condition_elements(condition, tile_height, tile_width, channels):
     text = condition.get("cross_attn")
     elements = text.shape[-2] * channels * 4 if text is not None else 0
     for keyframe in condition.get("minimax_keyframes") or []:
-        shape = keyframe["latent"].shape
-        elements += shape[1] * shape[2] * tile_height * tile_width
+        latent = keyframe.get("latent")
+        if latent is not None:
+            shape = latent.shape
+            elements += shape[1] * shape[2] * tile_height * tile_width
+        audio = keyframe.get("audio_latent")
+        if audio is not None:
+            elements += math.prod(audio.shape[1:])
     for reference in condition.get("minimax_refs") or []:
         latent = reference.get("latent")
         if latent is not None:
