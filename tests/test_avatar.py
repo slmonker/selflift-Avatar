@@ -814,6 +814,23 @@ class TilingTests(unittest.TestCase):
                     torch.testing.assert_close(out[1],a*3)
                     self.assertEqual(len(calls),tiles)
                     self.assertEqual(vm.min(),1.)
+    def test_audio_only_keyframe_survives_tiling(self):
+        # MiniMaxH3AddGuide without an image writes a keyframe that carries
+        # audio_latent only; memory budgeting and per-tile payload building
+        # must not assume every keyframe has a video latent.
+        audio_kf = {"resolved_frame_index": 0, "audio_latent": torch.zeros(1, 32, 2, 7)}
+        video_kf = {"resolved_frame_index": 0, "latent": torch.zeros(1, 24, 3, 12, 24)}
+        cond = {"minimax_keyframes": [audio_kf, video_kf]}
+        self.assertGreater(h3_tiling._condition_elements(cond, 12, 24, 24), 0)
+
+        v = torch.zeros(1, 24, 3, 12, 24)
+        a = torch.zeros(1, 32, 2, 7)
+        tiled = h3_tiling._tile_payload({"keyframes": [audio_kf, video_kf]},
+                                        torch.zeros(1, 2, 4), v, a, 3, 0, 12)
+        self.assertEqual([sorted(k) for k in tiled["keyframes"]],
+                         [["audio_latent", "resolved_frame_index"],
+                          ["latent", "resolved_frame_index"]])
+        self.assertEqual(len(tiled["cond_video_latents"]), 1)
     def test_forward_rejects_video_and_soft_audio_masks(self):
         v=torch.zeros(1,24,3,12,24);a=torch.zeros(1,32,2,7)
         for kwargs in [{'denoise_mask':torch.zeros(1,1,3,12,24)},
