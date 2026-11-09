@@ -183,6 +183,12 @@ This second preview is also muted; click it for the complete video with audio. B
 
 ## Installation
 
+### ComfyUI Manager
+
+Search for **SelfLift Avatar for MiniMax H3** in ComfyUI Manager, or install Registry ID `selflift-avatar`.
+
+[Comfy Registry page](https://registry.comfy.org/nodes/selflift-avatar)
+
 You need a working MiniMax H3 ComfyUI setup and the models, VAE, LoRA, and optional latent upscaler required by your workflow. This project adds no dependencies and does not include model weights.
 
 ### Git installation
