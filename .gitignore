@@ -9,3 +9,4 @@ debug/
 *.zip
 .env
 .env.*
+node.zip

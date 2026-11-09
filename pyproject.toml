@@ -1,0 +1,22 @@
+[project]
+name = "selflift-avatar"
+version = "0.2.0"
+description = "ComfyUI SelfLift Avatar nodes for MiniMax H3 audio-video masks, audio preservation, and high-resolution tiling"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "slmonker" }]
+keywords = ["comfyui", "selflift", "minimax-h3", "avatar", "video", "audio"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Topic :: Multimedia :: Video",
+]
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/slmonker/selflift-Avatar"
+Documentation = "https://github.com/slmonker/selflift-Avatar#readme"
+"Bug Tracker" = "https://github.com/slmonker/selflift-Avatar/issues"
+
+[tool.comfy]
+PublisherId = "slmonker"
+DisplayName = "SelfLift Avatar for MiniMax H3"
