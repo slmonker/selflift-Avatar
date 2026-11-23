@@ -280,6 +280,28 @@ class LongVideoNodeTests(unittest.TestCase):
         self.assertEqual(torch.count_nonzero(video_mask[:,:,:7]).item(),0)
         self.assertEqual(torch.count_nonzero(audio_mask[...,:37]).item(),0)
 
+class H3GridSnapTests(unittest.TestCase):
+    def test_snap_selects_nearest_aspect_aligned_size(self):
+        self.assertEqual(nodes._snap_h3_latent_spatial(58, 102), (60, 104))
+        self.assertEqual(nodes._snap_h3_latent_spatial(56, 100), (56, 100))
+
+    def test_video_latent_spatial_resize_keeps_temporal_axis(self):
+        video=torch.randn(1, 4, 7, 58, 102)
+        resized=nodes._resize_video_latent_spatial(video, 56, 100)
+        self.assertEqual(tuple(resized.shape), (1, 4, 7, 56, 100))
+        self.assertTrue(torch.isfinite(resized).all())
+
+    def test_latent_tail_pin_aligns_spatial_mismatch(self):
+        current_video=torch.randn(1,4,20,48,86); current_audio=torch.randn(1,8,2,80)
+        previous_video=torch.randn(1,4,20,48,88); previous_audio=torch.randn(1,8,2,80)
+        current={'samples':NestedTensor((current_video,current_audio))}
+        previous={'samples':NestedTensor((previous_video,previous_audio))}
+        result,_,video_steps,_=h3_latent_tail_pin.H3LatentTailPin().apply(current,previous,'22',True,False)
+        video,_=result['samples'].unbind()
+        self.assertEqual(tuple(video.shape),tuple(previous_video.shape))
+        self.assertEqual(video_steps,7)
+        torch.testing.assert_close(video[:,:,:7],previous_video[:,:,-7:])
+
 class StageModelInputTests(unittest.TestCase):
     def test_only_two_model_sockets_and_keyword_execution(self):
         low, high = Patcher(), Patcher()

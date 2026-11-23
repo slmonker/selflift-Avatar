@@ -4,7 +4,15 @@
 
 An independent experimental SelfLift branch for ComfyUI / MiniMax H3. It focuses on H3 audio-video latent masks, preserving source audio during sampling, and high-resolution spatial tiling / global-context memory saving. It registers separate node IDs, so it can coexist with the original SelfLift plugin.
 
-> **Experimental, unofficial project.** The current code has passed 96 CPU tests and two frontend suites with stubs. Earlier versions were exercised in the maintainer's H3 workflow; the new controls still need broader real-model and frontend testing. This is not a systematic benchmark of lip-sync accuracy, speed, or every model/plugin combination. Results can vary by character, audio, prompt, sampler, latent upscaler, and seed.
+> **Experimental, unofficial project.** The current code has passed 99 CPU tests and two frontend suites with stubs. Earlier versions were exercised in the maintainer's H3 workflow; the new controls still need broader real-model and frontend testing. This is not a systematic benchmark of lip-sync accuracy, speed, or every model/plugin combination. Results can vary by character, audio, prompt, sampler, latent upscaler, and seed.
+
+## Automatic H3 spatial-grid snapping (2026-11-24)
+
+`SelfLiftAvatarH3Sampler` now snaps H3 video latent spatial dimensions to a 4-latent-pixel multiple before sampling. At H3's 16x VAE scale this corresponds to 64-pixel alignment at the high-resolution stage, so the default `lowres_scale=0.5` lift is an exact 2x grid step. The sampler also resizes the video mask and H3 keyframe conditioning to the snapped grid; audio latent time steps are unchanged.
+
+`H3LatentTailPin` now spatially aligns the current latent to the previous sampler output when the upstream latent differs by a small grid amount. This prevents loop failures such as `48x86` versus `48x88` while preserving the hard AV-tail mask.
+
+The 1124 examples can therefore remain at their requested megapixel selector; the sampler reports the actual snapped latent size in the console. Existing content latents are spatially resampled when snapping is required.
 
 ## Long-video latent lock and seam nodes (2026-11-24)
 

@@ -73,6 +73,15 @@ def _fit_mask(mask, stream):
                 pass
     return comfy.utils.reshape_mask(mask, stream.shape).to(stream)
 
+def _resize_video_spatial(tensor, height, width, mode="bilinear"):
+    if tuple(tensor.shape[-2:]) == (height, width):
+        return tensor
+    b, c, t, h, w = tensor.shape
+    frames = tensor.float().permute(0, 2, 1, 3, 4).reshape(b * t, c, h, w)
+    frames = torch.nn.functional.interpolate(frames, size=(height, width), mode=mode)
+    return frames.reshape(b, t, c, height, width).permute(0, 2, 1, 3, 4).to(tensor.dtype)
+
+
 def _steps_for_frames(frames):
     frames = int(frames)
     if frames <= 0:
@@ -163,12 +172,20 @@ class H3LatentTailPin:
             )
         if previous_video.ndim != 5 or previous_audio.ndim != 4:
             raise ValueError("H3 Latent Tail Pin: previous latent is not an H3 AV latent")
-        if tuple(current_video.shape[1:2] + current_video.shape[3:]) != tuple(
-            previous_video.shape[1:2] + previous_video.shape[3:]
-        ):
+        if int(current_video.shape[1]) != int(previous_video.shape[1]):
             raise ValueError(
-                "H3 Latent Tail Pin: video channel/spatial shape mismatch: %s vs %s"
+                "H3 Latent Tail Pin: video channel mismatch: %s vs %s"
                 % (tuple(current_video.shape), tuple(previous_video.shape))
+            )
+        if tuple(current_video.shape[-2:]) != tuple(previous_video.shape[-2:]):
+            target_h, target_w = map(int, previous_video.shape[-2:])
+            source_shape = tuple(current_video.shape)
+            current_video = _resize_video_spatial(current_video, target_h, target_w, mode="bilinear")
+            existing_video_mask = _resize_video_spatial(existing_video_mask, target_h, target_w, mode="nearest")
+            LOG.info(
+                "H3 Latent Tail Pin: aligned current latent spatial %s -> %s "
+                "to match the previous sampler tail",
+                source_shape, tuple(current_video.shape),
             )
         if int(current_video.shape[2]) < video_steps:
             raise ValueError(
