@@ -440,14 +440,14 @@
         960,
         544,
         209,
-        "max"
+        "match"
       ],
       "widgets_values_named": {
         "prompt": "Photorealistic single-person talking-head performance with stable identity. Keep the exact same face, hairstyle, clothing, body proportions, background geometry, framing and lighting from the reference image. Natural lip sync, subtle head motion, stable eye contact and realistic blinking. The camera is completely locked on a tripod: no push-in, pull-out, zoom, pan, tilt, dolly, handheld movement or camera shake. Preserve the exact subject scale, head position, shoulder position and background alignment across every chunk. Continuous take, no cuts and no scene changes.",
         "width": 960,
         "height": 544,
         "length": 209,
-        "ref_image_size": "max"
+        "ref_image_size": "match"
       },
       "color": "#5a2b2b",
       "bgcolor": "#8b4444"

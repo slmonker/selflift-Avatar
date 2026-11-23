@@ -1,6 +1,7 @@
 # Changelog
 
 ## Main branch — 2026-11-24
+- Set `ref_image_size=match` in both 1124 examples to avoid the LynnReal `max` reference path, which upsizes 2736x1536 images to 3648x2048 and budgets roughly 7.4-7.7 GiB per request.
 
 - Merge `H3LatentTailPin`, `H3SeamColorAlign`, and `H3SeamFrameCover` into `selflift-Avatar` with unchanged node type IDs.
 - Register the bundled nodes under `selflift-Avatar/latent` and `selflift-Avatar/image`.

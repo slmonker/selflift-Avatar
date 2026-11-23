@@ -415,14 +415,14 @@
         960,
         544,
         209,
-        "max"
+        "match"
       ],
       "widgets_values_named": {
         "prompt": "Use <Picture 1> as the exact subject, wardrobe and style reference. Continuous cinematic single shot with stable identity, same background and lighting. Segment 1 of 4: establish the scene with subtle natural motion, steady eye contact and a relaxed opening expression. Natural lip sync. Camera remains stable with a very slight push-in. Preserve continuous ambience and diegetic sound; do not restart music at chunk boundaries. No cuts, dissolves, captions or scene changes.",
         "width": 960,
         "height": 544,
         "length": 209,
-        "ref_image_size": "max"
+        "ref_image_size": "match"
       },
       "color": "#5a2b2b",
       "bgcolor": "#8b4444"
@@ -3228,14 +3228,14 @@
         960,
         544,
         209,
-        "max"
+        "match"
       ],
       "widgets_values_named": {
         "prompt": "Use <Picture 1> as the exact subject, wardrobe and style reference. Continuous cinematic single shot with stable identity, same background and lighting. Segment 1 of 4: establish the scene with subtle natural motion, steady eye contact and a relaxed opening expression. Natural lip sync. Camera remains stable with a very slight push-in. Preserve continuous ambience and diegetic sound; do not restart music at chunk boundaries. No cuts, dissolves, captions or scene changes.",
         "width": 960,
         "height": 544,
         "length": 209,
-        "ref_image_size": "max"
+        "ref_image_size": "match"
       },
       "color": "#5a2b2b",
       "bgcolor": "#8b4444"

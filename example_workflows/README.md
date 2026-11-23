@@ -67,7 +67,8 @@ Audio-driven digital-human long-form example with automatic loop allocation from
 - Install all custom nodes used by the workflow, including the H3 Context Windows, Motion Context, KJNodes `ColorMatchV2`, and any attention/optimization nodes shown in the graph.
 - Model files are not included. Replace local reference images and audio paths.
 - Run these workflows only after restarting ComfyUI so the bundled nodes are loaded from `selflift-Avatar`.
-- The 1.5 MP Ref2VA example can use nearly all 32 GB of VRAM on a 5090-class GPU. Lower `megapixels`, `highres_token_chunk`, or `highres_weight_cache_gb` when memory is tight.
+- The 1124 examples use `ref_image_size=match` so reference images are encoded at the generation canvas instead of LynnReal's official `max` path, which upsizes references to a 2048 px short edge and can cost roughly 7.4-7.7 GiB per request.
+- The 1.5 MP Ref2VA example can still use nearly all 32 GB of VRAM on a 5090-class GPU. Lower `megapixels`, `highres_token_chunk`, or `highres_weight_cache_gb` when memory is tight.
 
 ## Credits
 
