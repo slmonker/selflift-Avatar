@@ -214,46 +214,6 @@ def _debug_dump(vae, latents):
         Image.fromarray(frame).save(os.path.join(out_dir, name + ".png"))
 
 
-_H3_SPATIAL_LATENT_MULTIPLE = 4
-
-
-def _snap_h3_latent_spatial(height, width, multiple=_H3_SPATIAL_LATENT_MULTIPLE):
-    """Choose the nearest H3 latent size whose spatial axes align to the VAE/DiT grid."""
-    height = int(height)
-    width = int(width)
-    multiple = int(multiple)
-    if height % multiple == 0 and width % multiple == 0:
-        return height, width
-    target_ratio = width / float(height)
-    target_area = width * height
-
-    def candidates(value):
-        low = max(multiple, ((value - 2 * multiple) // multiple) * multiple)
-        high = max(low, value + 2 * multiple)
-        return range(low, high + 1, multiple)
-
-    best = (height, width)
-    best_score = float("inf")
-    for candidate_h in candidates(height):
-        for candidate_w in candidates(width):
-            ratio_error = abs(candidate_w / float(candidate_h) - target_ratio) / max(target_ratio, 1e-9)
-            area_error = abs(candidate_w * candidate_h - target_area) / max(target_area, 1)
-            score = ratio_error * 10.0 + area_error
-            if score < best_score:
-                best_score = score
-                best = (candidate_h, candidate_w)
-    return best
-
-
-def _resize_video_latent_spatial(video, height, width):
-    if tuple(video.shape[-2:]) == (height, width):
-        return video
-    b, c, t, h, w = video.shape
-    frames = video.float().permute(0, 2, 1, 3, 4).reshape(b * t, c, h, w)
-    frames = torch.nn.functional.interpolate(frames, size=(height, width), mode="bilinear", align_corners=False)
-    return frames.reshape(b, t, c, height, width).permute(0, 2, 1, 3, 4).to(video.dtype)
-
-
 def progressive_sample(low_res_model, positive, negative, vae, latent_image, sampler, sigmas, seed, cfg,
                        transition_step, lowres_scale, rho, w_min, w_max, latent_upsample, latent_lifter=None,
                        highres_tiling=False, high_res_model=None, tiling_mode="auto", tiling_tiles=2,
@@ -345,28 +305,6 @@ def progressive_sample(low_res_model, positive, negative, vae, latent_image, sam
     else:
         b, c, H, W = streams[0].shape
         t = None
-
-    if video:
-        source_h, source_w = H, W
-        snapped_h, snapped_w = _snap_h3_latent_spatial(H, W)
-        if (snapped_h, snapped_w) != (source_h, source_w):
-            streams[0] = _resize_video_latent_spatial(streams[0], snapped_h, snapped_w)
-            H, W = snapped_h, snapped_w
-            latent_image = latent_image.copy()
-            latent_image["samples"] = _pack(streams, nested)
-            if noise_masks is not None:
-                noise_masks = [avatar_masks.resize_spatial(noise_masks[0], (H, W))] + noise_masks[1:]
-                if nested:
-                    latent_image["noise_mask"] = comfy.nested_tensor.NestedTensor(tuple(noise_masks))
-                else:
-                    latent_image["noise_mask"] = noise_masks[0]
-            logging.info(
-                "[selflift-Avatar grid snap] H3 latent spatial %s -> %s "
-                "(pixels %.0fx%.0f -> %.0fx%.0f); audio latent unchanged",
-                (source_h, source_w), (H, W),
-                source_w * 16.0, source_h * 16.0, W * 16.0, H * 16.0,
-            )
-
     h = max(2, round(H * lowres_scale / 2) * 2)
     w = max(2, round(W * lowres_scale / 2) * 2)
     low_shape = (b, c, t, h, w) if video else (b, c, h, w)
@@ -542,8 +480,7 @@ def progressive_sample(low_res_model, positive, negative, vae, latent_image, sam
         return result
 
     high_timer = _StageTimer("high_resolution", high_model.load_device, (H, W), resolution_scale)
-    positive_high = _resize_keyframes(positive, H, W)
-    negative_high = _resize_keyframes(negative, H, W)
+    positive_high = positive
     if lowres_anchor is not None:
         positive_high = spatial_anchor_utils.append_global_video_reference(positive, lowres_anchor)
         logging.info(
@@ -558,7 +495,7 @@ def progressive_sample(low_res_model, positive, negative, vae, latent_image, sam
             logging.info("[selflift-Avatar plan] high-resolution global context enabled; mode=%s token_chunk=%d "
                          "weight_cache=%.2f GiB; masks remain full-sequence",
                          highres_tiling_mode, highres_token_chunk, highres_weight_cache_gb)
-    out = comfy.samplers.sample(high_model, resume_noise, positive_high, negative_high, cfg, high_model.load_device,
+    out = comfy.samplers.sample(high_model, resume_noise, positive_high, negative, cfg, high_model.load_device,
                                 sampler, sigmas[transition_step:], high_model.model_options,
                                 latent_image=resume_latent, callback=callback_high,
                                 disable_pbar=disable_pbar, seed=seed)

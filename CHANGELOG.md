@@ -1,8 +1,6 @@
 # Changelog
 
 ## Main branch — 2026-11-24
-- Snap H3 video-latent spatial dimensions to a 4-latent-pixel grid before SelfLift sampling, resize video masks and keyframe conditioning consistently, and spatially align mismatched current latents inside `H3LatentTailPin`. This makes the default 0.5 low-res lift an exact 2x grid step and fixes loop shape errors such as `48x86` versus `48x88`.
-- Add CPU regression tests for nearest-grid selection, video latent spatial resizing, and latent-tail-pin mismatch alignment. 99 CPU tests pass.
 - Set `ref_image_size=match` in both 1124 examples to avoid the LynnReal `max` reference path, which upsizes 2736x1536 images to 3648x2048 and budgets roughly 7.4-7.7 GiB per request.
 
 - Merge `H3LatentTailPin`, `H3SeamColorAlign`, and `H3SeamFrameCover` into `selflift-Avatar` with unchanged node type IDs.
