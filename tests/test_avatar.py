@@ -20,7 +20,7 @@ spec = importlib.util.spec_from_file_location('selflift_avatar_test', PLUGIN/'__
 plugin = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = plugin
 spec.loader.exec_module(plugin)
-from selflift_avatar_test import nodes, avatar_masks as masks, selflift, avatar_sampling, h3_tiling, h3_global_tiling, h3_output_chunking, h3_upscaler, spatial_anchor
+from selflift_avatar_test import nodes, avatar_masks as masks, selflift, avatar_sampling, h3_tiling, h3_global_tiling, h3_output_chunking, h3_upscaler, spatial_anchor, h3_latent_tail_pin, h3_seam_color_align
 import torch
 import comfy.latent_formats
 import comfy.ldm.minimax.model
@@ -239,11 +239,46 @@ class MaskTests(unittest.TestCase):
         self.assertEqual(out.shape, self.v.shape)
         self.assertTrue(torch.isfinite(out).all())
     def test_unique_registration(self):
-        self.assertEqual(set(plugin.NODE_CLASS_MAPPINGS), {'SelfLiftAvatarH3Sampler','SelfLiftAvatarH3SpatialAnchoredSampler','SelfLiftAvatarImageSampler','SelfLiftAvatarH3TST'})
-        for cls in plugin.NODE_CLASS_MAPPINGS.values():
+        core={'SelfLiftAvatarH3Sampler','SelfLiftAvatarH3SpatialAnchoredSampler','SelfLiftAvatarImageSampler','SelfLiftAvatarH3TST'}
+        long_video={'H3LatentTailPin','H3SeamColorAlign','H3SeamFrameCover'}
+        self.assertEqual(set(plugin.NODE_CLASS_MAPPINGS), core | long_video)
+        for name in core:
+            cls=plugin.NODE_CLASS_MAPPINGS[name]
             self.assertEqual(cls.CATEGORY, 'selflift-Avatar')
             model_input = 'model' if cls is nodes.SelfLiftAvatarH3TST else 'low_res_model'
             self.assertIn(model_input, cls.INPUT_TYPES()['required'])
+        self.assertEqual(plugin.NODE_CLASS_MAPPINGS['H3LatentTailPin'].CATEGORY, 'selflift-Avatar/latent')
+        self.assertEqual(plugin.NODE_CLASS_MAPPINGS['H3SeamColorAlign'].CATEGORY, 'selflift-Avatar/image')
+        self.assertEqual(plugin.NODE_CLASS_MAPPINGS['H3SeamFrameCover'].CATEGORY, 'selflift-Avatar/image')
+
+class LongVideoNodeTests(unittest.TestCase):
+    def test_seam_align_and_cover_cpu(self):
+        current=torch.rand(40,36,64,3)
+        previous=torch.rand(5,36,64,3)*0.8+0.1
+        aligned,last=h3_seam_color_align.H3SeamColorAlign().align(
+            current,previous,align_frames=36,analysis_frames=5,strength=.9,scale_limit=.15,bypass=False)
+        covered=h3_seam_color_align.H3SeamFrameCover().cover(
+            aligned,previous,cover_frames=1,blend_frames=1,bypass=False)[0]
+        self.assertEqual(aligned.shape,current.shape)
+        self.assertEqual(last.shape,(5,36,64,3))
+        self.assertEqual(covered.shape,current.shape)
+        self.assertTrue(torch.isfinite(covered).all())
+        bypass=h3_seam_color_align.H3SeamFrameCover().cover(current,previous,1,1,True)[0]
+        torch.testing.assert_close(bypass,current.float())
+
+    def test_latent_tail_pin_cpu(self):
+        current_video=torch.randn(1,4,20,4,4); current_audio=torch.randn(1,8,2,80)
+        previous_video=torch.randn(1,4,20,4,4); previous_audio=torch.randn(1,8,2,80)
+        current={'samples':NestedTensor((current_video,current_audio))}
+        previous={'samples':NestedTensor((previous_video,previous_audio))}
+        result,pin_frames,video_steps,audio_steps=h3_latent_tail_pin.H3LatentTailPin().apply(
+            current,previous,'22',True,False)
+        video,audio=result['samples'].unbind(); video_mask,audio_mask=result['noise_mask'].unbind()
+        self.assertEqual((pin_frames,video_steps,audio_steps),(22,7,37))
+        torch.testing.assert_close(video[:,:,:7],previous_video[:,:,-7:])
+        torch.testing.assert_close(audio[...,:37],previous_audio[...,-37:])
+        self.assertEqual(torch.count_nonzero(video_mask[:,:,:7]).item(),0)
+        self.assertEqual(torch.count_nonzero(audio_mask[...,:37]).item(),0)
 
 class StageModelInputTests(unittest.TestCase):
     def test_only_two_model_sockets_and_keyword_execution(self):

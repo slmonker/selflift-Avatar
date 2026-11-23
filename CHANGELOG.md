@@ -1,5 +1,13 @@
 # Changelog
 
+## Main branch — 2026-11-24
+
+- Merge `H3LatentTailPin`, `H3SeamColorAlign`, and `H3SeamFrameCover` into `selflift-Avatar` with unchanged node type IDs.
+- Register the bundled nodes under `selflift-Avatar/latent` and `selflift-Avatar/image`.
+- Add CPU regression coverage for AV latent-tail pinning, seam color alignment, and first-frame covering. 96 CPU tests pass.
+- Add the 1124 Ref2VA long-video multi-prompt workflow and the 1124 digital-human long-video loop workflow to `example_workflows`.
+- Document the bundled long-video node APIs and example-workflow requirements.
+
 ## Main branch — 2026-11-02
 
 - Merge the full-frame low-resolution anchor, content-aware cut placement and seam diagnostics into the original `SelfLiftAvatarH3Sampler` spatial path without adding new node options.

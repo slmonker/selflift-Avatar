@@ -39,6 +39,8 @@ from . import spatial_anchor as spatial_anchor_utils
 from .tiling_ui import format_plan
 from . import h3_tst
 from .diagnostics import log_memory
+from .h3_latent_tail_pin import H3LatentTailPin
+from .h3_seam_color_align import H3SeamColorAlign, H3SeamFrameCover
 
 _HIGHRES_TILING_MODES = ("spatial", "global_stream", "global", "global_ram")
 _GLOBAL_TILING_MODES = frozenset(("global_stream", "global", "global_ram"))
@@ -824,3 +826,16 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "SelfLiftAvatarImageSampler": "selflift-Avatar Sampler (Image)",
     "SelfLiftAvatarH3TST": "selflift-Avatar H3 TST",
 }
+
+# Long-video support bundled with selflift-Avatar.
+NODE_CLASS_MAPPINGS.update({
+    "H3LatentTailPin": H3LatentTailPin,
+    "H3SeamColorAlign": H3SeamColorAlign,
+    "H3SeamFrameCover": H3SeamFrameCover,
+})
+
+NODE_DISPLAY_NAME_MAPPINGS.update({
+    "H3LatentTailPin": "H3 Latent Tail Pin (Hard Overlap)",
+    "H3SeamColorAlign": "H3 Seam Color Align",
+    "H3SeamFrameCover": "H3 Seam Frame Cover",
+})

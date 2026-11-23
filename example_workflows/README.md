@@ -41,6 +41,34 @@ maintainer's H3 setup.
   shown in the node status panel and the console. Do not judge the result from
   the first high-resolution preview alone; let all high-resolution steps finish.
 
+## `Selflift-avatar参考生视频_多提示词版_硬Latent续接版1124.json`
+
+Reference-to-video long-form example using four editable segment prompts, automatic loop allocation, Motion Context, H3 Context Windows, Add Guide, and the bundled seam nodes.
+
+- Resolution: 1.5 MP, 16:9
+- Chunk frames: 209
+- Overlap: 22 frames
+- Extra settle trim: 10 frames
+- SelfLift: `global_stream`, token chunk 4096, 4 GiB weight cache
+- Optional seam nodes: `H3LatentTailPin`, `H3SeamColorAlign`, `H3SeamFrameCover`
+
+## `Selflift-avatar数字人长视频自循环1124.json`
+
+Audio-driven digital-human long-form example with automatic loop allocation from the selected audio duration and the same seam-preservation nodes.
+
+- Resolution: 1.0 MP, 16:9
+- Chunk frames: 209
+- Overlap: 22 frames
+- Extra settle trim: 10 frames
+- SelfLift: `global_stream`, token chunk 4096, 4 GiB weight cache
+
+### Before running the 1124 examples
+
+- Install all custom nodes used by the workflow, including the H3 Context Windows, Motion Context, KJNodes `ColorMatchV2`, and any attention/optimization nodes shown in the graph.
+- Model files are not included. Replace local reference images and audio paths.
+- Run these workflows only after restarting ComfyUI so the bundled nodes are loaded from `selflift-Avatar`.
+- The 1.5 MP Ref2VA example can use nearly all 32 GB of VRAM on a 5090-class GPU. Lower `megapixels`, `highres_token_chunk`, or `highres_weight_cache_gb` when memory is tight.
+
 ## Credits
 
 Special thanks to [Fish4AI](https://github.com/Fish4AI), author of
