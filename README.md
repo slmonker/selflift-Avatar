@@ -4,17 +4,24 @@
 
 An independent experimental SelfLift branch for ComfyUI / MiniMax H3. It focuses on H3 audio-video latent masks, preserving source audio during sampling, and high-resolution spatial tiling / global-context memory saving. It registers separate node IDs, so it can coexist with the original SelfLift plugin.
 
-> **Experimental, unofficial project.** The current code has passed 96 CPU tests and two frontend suites with stubs. Earlier versions were exercised in the maintainer's H3 workflow; the new controls still need broader real-model and frontend testing. This is not a systematic benchmark of lip-sync accuracy, speed, or every model/plugin combination. Results can vary by character, audio, prompt, sampler, latent upscaler, and seed.
+> **Experimental, unofficial project.** The current code has passed 98 CPU tests and two frontend suites with stubs. Earlier versions were exercised in the maintainer's H3 workflow; the new controls still need broader real-model and frontend testing. This is not a systematic benchmark of lip-sync accuracy, speed, or every model/plugin combination. Results can vary by character, audio, prompt, sampler, latent upscaler, and seed.
 
 ## Long-video latent lock and seam nodes (2026-11-24)
 
-Three long-video helper nodes are now bundled directly into `selflift-Avatar` with unchanged node type IDs, so existing workflows do not need to be rewired:
+Four long-video helper nodes are bundled directly into `selflift-Avatar`:
 
+- `H3LatentGridSnap` aligns the video spatial axes of an H3 AV latent to the nearest valid 4-latent-pixel grid before Motion Context. Audio and temporal axes are unchanged.
 - `H3LatentTailPin` hard-pins the previous AV latent tail into the new chunk and creates a preserved-region noise mask.
 - `H3SeamColorAlign` smoothly aligns color, brightness, and contrast of the new chunk's leading frames to the previous tail.
 - `H3SeamFrameCover` covers the first new-chunk frame with the previous last frame and optionally blends following frames.
 
-The nodes are registered under `selflift-Avatar/latent` and `selflift-Avatar/image`. The former standalone packages can be disabled; after a ComfyUI restart, this project provides all three nodes. The CPU suite now has 96 passing tests.
+The nodes are registered under `selflift-Avatar/latent` and `selflift-Avatar/image`. The former standalone packages can be disabled; after a ComfyUI restart, this project provides all four nodes. The CPU suite now has 98 passing tests.
+
+### Grid-snap loop fix
+
+SelfLift's H3 sampler requires latent spatial dimensions aligned to a 4-latent-pixel grid (64 output pixels). A `1376x768` request therefore becomes `1408x768` inside the sampler. In a Motion Context loop the previous chunk has already been sampled at `1408x768`, while the next chunk can still be presented to Motion Context at `1376x768`; the node correctly refuses to resize the generated latent and stops before SelfLift can perform its own alignment.
+
+The 1124 examples now wire `H3LatentGridSnap` immediately after the H3 reference/latent source and before every latent consumer, including Motion Context, Add Guide, and the initial loop-state latent. The previous generated latent is never resampled.
 
 ## Main-branch fix: long-clip latent upscaler frame-0 artifact (2026-10-25)
 

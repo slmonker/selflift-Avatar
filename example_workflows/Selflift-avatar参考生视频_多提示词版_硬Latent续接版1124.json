@@ -397,10 +397,7 @@
           "type": "LATENT",
           "slot_index": 1,
           "links": [
-            31,
-            127,
-            138,
-            198
+            210
           ]
         }
       ],
@@ -3593,6 +3590,48 @@
       "color": "#3a2f5c",
       "bgcolor": "#5d4b91",
       "title": "H3 Seam Frame Cover"
+    },
+    {
+      "id": 117,
+      "type": "H3LatentGridSnap",
+      "title": "H3 Latent Grid Snap",
+      "pos": [
+        1309.6388177660465,
+        517.3831302934866
+      ],
+      "size": [
+        440.0,
+        100.0
+      ],
+      "flags": {},
+      "order": 62,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "latent",
+          "name": "latent",
+          "type": "LATENT",
+          "link": 210
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "latent",
+          "name": "latent",
+          "type": "LATENT",
+          "slot_index": 0,
+          "links": [
+            31,
+            127,
+            138,
+            198
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "H3LatentGridSnap"
+      },
+      "widgets_values": []
     }
   ],
   "links": [
@@ -3630,8 +3669,8 @@
     ],
     [
       31,
-      10,
-      1,
+      117,
+      0,
       21,
       2,
       "LATENT"
@@ -3838,8 +3877,8 @@
     ],
     [
       138,
-      10,
-      1,
+      117,
+      0,
       89,
       1,
       "LATENT"
@@ -4006,8 +4045,8 @@
     ],
     [
       198,
-      10,
-      1,
+      117,
+      0,
       112,
       0,
       "LATENT"
@@ -4150,8 +4189,8 @@
     ],
     [
       127,
-      10,
-      1,
+      117,
+      0,
       86,
       0,
       "LATENT"
@@ -4443,6 +4482,14 @@
       105,
       3,
       "STRING"
+    ],
+    [
+      210,
+      10,
+      1,
+      117,
+      0,
+      "LATENT"
     ]
   ],
   "groups": [

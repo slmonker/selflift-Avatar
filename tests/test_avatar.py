@@ -20,7 +20,7 @@ spec = importlib.util.spec_from_file_location('selflift_avatar_test', PLUGIN/'__
 plugin = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = plugin
 spec.loader.exec_module(plugin)
-from selflift_avatar_test import nodes, avatar_masks as masks, selflift, avatar_sampling, h3_tiling, h3_global_tiling, h3_output_chunking, h3_upscaler, spatial_anchor, h3_latent_tail_pin, h3_seam_color_align
+from selflift_avatar_test import nodes, avatar_masks as masks, selflift, avatar_sampling, h3_tiling, h3_global_tiling, h3_output_chunking, h3_upscaler, spatial_anchor, h3_latent_grid, h3_latent_tail_pin, h3_seam_color_align
 import torch
 import comfy.latent_formats
 import comfy.ldm.minimax.model
@@ -240,7 +240,7 @@ class MaskTests(unittest.TestCase):
         self.assertTrue(torch.isfinite(out).all())
     def test_unique_registration(self):
         core={'SelfLiftAvatarH3Sampler','SelfLiftAvatarH3SpatialAnchoredSampler','SelfLiftAvatarImageSampler','SelfLiftAvatarH3TST'}
-        long_video={'H3LatentTailPin','H3SeamColorAlign','H3SeamFrameCover'}
+        long_video={'H3LatentGridSnap','H3LatentTailPin','H3SeamColorAlign','H3SeamFrameCover'}
         self.assertEqual(set(plugin.NODE_CLASS_MAPPINGS), core | long_video)
         for name in core:
             cls=plugin.NODE_CLASS_MAPPINGS[name]
@@ -279,6 +279,34 @@ class LongVideoNodeTests(unittest.TestCase):
         torch.testing.assert_close(audio[...,:37],previous_audio[...,-37:])
         self.assertEqual(torch.count_nonzero(video_mask[:,:,:7]).item(),0)
         self.assertEqual(torch.count_nonzero(audio_mask[...,:37]).item(),0)
+
+class H3GridSnapTests(unittest.TestCase):
+    def test_latent_grid_snap_aligns_source_without_touching_audio(self):
+        video=torch.randn(1,4,20,48,86); audio=torch.randn(1,8,2,80)
+        video_mask=torch.ones_like(video); audio_mask=torch.ones_like(audio)
+        latent={
+            'samples':NestedTensor((video,audio)),
+            'noise_mask':NestedTensor((video_mask,audio_mask)),
+            'batch_index':[0],
+        }
+        result,=h3_latent_grid.H3LatentGridSnap().apply(latent)
+        out_video,out_audio=result['samples'].unbind()
+        out_video_mask,out_audio_mask=result['noise_mask'].unbind()
+        self.assertEqual(tuple(out_video.shape),(1,4,20,48,88))
+        self.assertEqual(tuple(out_video_mask.shape),(1,4,20,48,88))
+        torch.testing.assert_close(out_audio,audio,rtol=0,atol=0)
+        torch.testing.assert_close(out_audio_mask,audio_mask,rtol=0,atol=0)
+        self.assertEqual(result['batch_index'],[0])
+        self.assertIsNot(result,latent)
+
+    def test_latent_grid_snap_is_identity_on_aligned_shape(self):
+        video=torch.randn(1,4,20,48,88); audio=torch.randn(1,8,2,80)
+        latent={'samples':NestedTensor((video,audio))}
+        result,=h3_latent_grid.H3LatentGridSnap().apply(latent)
+        out_video,out_audio=result['samples'].unbind()
+        self.assertIs(out_video,video)
+        self.assertIs(out_audio,audio)
+        self.assertNotIn('noise_mask',result)
 
 class StageModelInputTests(unittest.TestCase):
     def test_only_two_model_sockets_and_keyword_execution(self):

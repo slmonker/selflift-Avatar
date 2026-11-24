@@ -4,17 +4,24 @@
 
 这是一个面向 ComfyUI / MiniMax H3 的 SelfLift 独立实验分支，重点处理 H3 音视频 latent 遮罩、采样过程中的原始音频保留，以及高分辨率空间分块 / 全局上下文省显存。它使用独立的节点 ID，可以和原版 SelfLift 共存。
 
-> **实验版本，非官方项目。** 当前代码已通过 96 项 CPU 测试和两套模拟前端测试。此前版本已在维护者的 H3 工作流中试用；新控件仍需更多真实模型与前端测试。尚未进行系统性的口型准确率、速度和所有模型/插件组合测试。不同角色、音频、提示词、采样器、latent upscaler 和 seed 可能产生不同结果。
+> **实验版本，非官方项目。** 当前代码已通过 98 项 CPU 测试和两套模拟前端测试。此前版本已在维护者的 H3 工作流中试用；新控件仍需更多真实模型与前端测试。尚未进行系统性的口型准确率、速度和所有模型/插件组合测试。不同角色、音频、提示词、采样器、latent upscaler 和 seed 可能产生不同结果。
 
 ## 长视频 latent 锁定与接缝节点（2026-11-24）
 
-三个长视频辅助节点已直接并入 `selflift-Avatar`，节点类型 ID 保持不变，现有工作流无需重新接线：
+四个长视频辅助节点已并入 `selflift-Avatar`：
 
+- `H3LatentGridSnap`：在进入 Motion Context 前，把 H3 音视频 latent 的视频空间轴对齐到最近的 4 latent 像素网格；音频轴和时间轴不变。
 - `H3LatentTailPin`：把上一段 AV latent 尾部硬锁定到当前段开头，并生成保留区噪声遮罩。
 - `H3SeamColorAlign`：使用上一段尾帧对当前段前 N 帧做颜色、亮度和对比度渐变对齐。
 - `H3SeamFrameCover`：用上一段最后一帧覆盖当前段首帧，并做可选短混合。
 
-节点分类为 `selflift-Avatar/latent` 和 `selflift-Avatar/image`。原独立节点包可停用；重启 ComfyUI 后由本项目统一提供。新增回归测试后共 96 项 CPU 测试通过。
+节点分类为 `selflift-Avatar/latent` 和 `selflift-Avatar/image`。原独立节点包可停用；重启 ComfyUI 后由本项目统一提供。新增回归测试后共 98 项 CPU 测试通过。
+
+### 网格对齐循环修复
+
+SelfLift 的 H3 采样器要求 latent 空间尺寸对齐到 4 latent 像素网格（输出 64 像素）。因此 `1376x768` 会在采样器内部变成 `1408x768`。在 Motion Context 循环中，上一段已经按 `1408x768` 采样，而下一段进入 Motion Context 时可能仍是 `1376x768`；节点拒绝缩放已经生成的 latent，因此在 SelfLift 执行对齐之前就停止。
+
+两个 1124 示例工作流现在都在 H3 参考/latent 源节点之后、所有 latent 消费者之前接入 `H3LatentGridSnap`，包括 Motion Context、Add Guide 和初始循环状态 latent。上一段已经生成的 latent 不需要被重新缩放。
 
 ## 主分支修复：长视频 latent upscaler 首帧伪影（2026-10-25）
 

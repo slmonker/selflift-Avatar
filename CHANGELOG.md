@@ -1,6 +1,9 @@
 # Changelog
 
 ## Main branch — 2026-11-24
+- Add `H3LatentGridSnap` under `selflift-Avatar/latent`. It aligns only the video spatial axes of an H3 AV latent to the nearest 4-latent-pixel grid; audio and temporal axes are unchanged.
+- Wire `H3LatentGridSnap` after the H3 reference/latent source in both 1124 example workflows, before Motion Context, Add Guide, and the initial loop-state latent. This prevents `1376x768` versus `1408x768` loop failures without resampling the previous generated latent.
+- Add CPU tests for spatial-only resizing, video-mask resizing, audio preservation, aligned no-op behavior, and node registration. 98 CPU tests pass.
 - Set `ref_image_size=match` in both 1124 examples to avoid the LynnReal `max` reference path, which upsizes 2736x1536 images to 3648x2048 and budgets roughly 7.4-7.7 GiB per request.
 
 - Merge `H3LatentTailPin`, `H3SeamColorAlign`, and `H3SeamFrameCover` into `selflift-Avatar` with unchanged node type IDs.

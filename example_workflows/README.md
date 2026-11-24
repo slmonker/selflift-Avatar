@@ -43,7 +43,7 @@ maintainer's H3 setup.
 
 ## `Selflift-avatar参考生视频_多提示词版_硬Latent续接版1124.json`
 
-Reference-to-video long-form example using four editable segment prompts, automatic loop allocation, Motion Context, H3 Context Windows, Add Guide, and the bundled seam nodes.
+Reference-to-video long-form example using four editable segment prompts, automatic loop allocation, Motion Context, H3 Context Windows, Add Guide, and the bundled seam nodes. `H3LatentGridSnap` sits directly after the base H3 AV latent source and before every latent consumer.
 
 - Resolution: 1.5 MP, 16:9
 - Chunk frames: 209
@@ -54,13 +54,15 @@ Reference-to-video long-form example using four editable segment prompts, automa
 
 ## `Selflift-avatar数字人长视频自循环1124.json`
 
-Audio-driven digital-human long-form example with automatic loop allocation from the selected audio duration and the same seam-preservation nodes.
+Audio-driven digital-human long-form example with automatic loop allocation from the selected audio duration and the same seam-preservation nodes. `H3LatentGridSnap` sits directly after the H3 AV latent source and before Motion Context and the initial loop-state latent.
 
 - Resolution: 1.0 MP, 16:9
 - Chunk frames: 209
 - Overlap: 22 frames
 - Extra settle trim: 10 frames
 - SelfLift: `global_stream`, token chunk 4096, 4 GiB weight cache
+
+The 1124 workflows preserve their original megapixel selectors. `H3LatentGridSnap` converts a request such as `1376x768` to the sampler's valid `1408x768` grid before Motion Context sees it, so the current and previous chunks always have the same latent shape.
 
 ### Before running the 1124 examples
 

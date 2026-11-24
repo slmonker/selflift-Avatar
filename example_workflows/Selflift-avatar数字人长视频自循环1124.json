@@ -1,8 +1,8 @@
 {
   "id": "0b7fbaae-ae97-4aee-bc0b-3a285a66ddf2",
   "revision": 0,
-  "last_node_id": 96,
-  "last_link_id": 158,
+  "last_node_id": 97,
+  "last_link_id": 159,
   "nodes": [
     {
       "id": 1,
@@ -424,8 +424,7 @@
           "type": "LATENT",
           "slot_index": 1,
           "links": [
-            27,
-            127
+            159
           ]
         }
       ],
@@ -4790,6 +4789,46 @@
       "color": "#3a2f5c",
       "bgcolor": "#5d4b91",
       "title": "H3 Seam Color Align"
+    },
+    {
+      "id": 97,
+      "type": "H3LatentGridSnap",
+      "title": "H3 Latent Grid Snap",
+      "pos": [
+        1300.3753509020673,
+        506.2220863862127
+      ],
+      "size": [
+        440.0,
+        100.0
+      ],
+      "flags": {},
+      "order": 93,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "latent",
+          "name": "latent",
+          "type": "LATENT",
+          "link": 159
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "latent",
+          "name": "latent",
+          "type": "LATENT",
+          "slot_index": 0,
+          "links": [
+            27,
+            127
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "H3LatentGridSnap"
+      },
+      "widgets_values": []
     }
   ],
   "links": [
@@ -4859,8 +4898,8 @@
     ],
     [
       27,
-      10,
-      1,
+      97,
+      0,
       15,
       0,
       "LATENT"
@@ -5579,8 +5618,8 @@
     ],
     [
       127,
-      10,
-      1,
+      97,
+      0,
       86,
       0,
       "LATENT"
@@ -5736,6 +5775,14 @@
       44,
       4,
       "INT"
+    ],
+    [
+      159,
+      10,
+      1,
+      97,
+      0,
+      "LATENT"
     ]
   ],
   "groups": [
